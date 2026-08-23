@@ -306,6 +306,15 @@ export const AppProvider = ({ children }) => {
     });
   };
 
+  const startDemoMode = () => {
+    setUser({
+      uid: 'demo_user',
+      displayName: 'Demo Executive',
+      email: 'demo@factoryflow.local'
+    });
+    loadLocalDemoState();
+  };
+
   const loginWithGoogle = async () => {
     if (auth) {
       try {
@@ -315,7 +324,7 @@ export const AppProvider = ({ children }) => {
         alert('Google Sign-in failed: ' + e.message);
       }
     } else {
-      alert('Please configure your Firebase credentials first!');
+      setActiveModal('firebase');
     }
   };
 
@@ -347,7 +356,7 @@ export const AppProvider = ({ children }) => {
   const saveFactoryDoc = async (id, data) => {
     const clean = sanitizeForFirestore(data);
     if (id) {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await updateDoc(doc(db, 'users', user.uid, 'factories', id), clean);
       } else {
         const updated = factories.map(f => f.id === id ? { ...f, ...clean, id } : f);
@@ -355,7 +364,7 @@ export const AppProvider = ({ children }) => {
         saveLocalDemoState({ factories: updated });
       }
     } else {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await addDoc(collection(db, 'users', user.uid, 'factories'), clean);
       } else {
         const updated = [{ ...clean, id: 'f_' + Date.now() }, ...factories];
@@ -368,7 +377,7 @@ export const AppProvider = ({ children }) => {
   const deleteFactoryDoc = async (id) => {
     const f = factories.find(i => i.id === id);
     if (confirm(`Delete factory "${f ? f.factoryName : ''}"?`)) {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await deleteDoc(doc(db, 'users', user.uid, 'factories', id));
       } else {
         const updated = factories.filter(i => i.id !== id);
@@ -382,7 +391,7 @@ export const AppProvider = ({ children }) => {
   const saveCustomerDoc = async (id, data) => {
     const clean = sanitizeForFirestore(data);
     if (id) {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await updateDoc(doc(db, 'users', user.uid, 'customers', id), clean);
       } else {
         const updated = customers.map(c => c.id === id ? { ...c, ...clean, id } : c);
@@ -390,7 +399,7 @@ export const AppProvider = ({ children }) => {
         saveLocalDemoState({ customers: updated });
       }
     } else {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await addDoc(collection(db, 'users', user.uid, 'customers'), clean);
       } else {
         const updated = [{ ...clean, id: 'c_' + Date.now() }, ...customers];
@@ -403,7 +412,7 @@ export const AppProvider = ({ children }) => {
   const deleteCustomerDoc = async (id) => {
     const c = customers.find(i => i.id === id);
     if (confirm(`Delete customer "${c ? c.customerName : ''}"?`)) {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await deleteDoc(doc(db, 'users', user.uid, 'customers', id));
       } else {
         const updated = customers.filter(i => i.id !== id);
@@ -417,7 +426,7 @@ export const AppProvider = ({ children }) => {
   const saveBoxDoc = async (id, data) => {
     const clean = sanitizeForFirestore(data);
     if (id) {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await updateDoc(doc(db, 'users', user.uid, 'boxDetails', id), clean);
       } else {
         const updated = boxDetails.map(b => b.id === id ? { ...b, ...clean, id } : b);
@@ -425,7 +434,7 @@ export const AppProvider = ({ children }) => {
         saveLocalDemoState({ boxDetails: updated });
       }
     } else {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await addDoc(collection(db, 'users', user.uid, 'boxDetails'), clean);
       } else {
         const updated = [{ ...clean, id: 'b_' + Date.now() }, ...boxDetails];
@@ -438,7 +447,7 @@ export const AppProvider = ({ children }) => {
   const deleteBoxDoc = async (id) => {
     const b = boxDetails.find(i => i.id === id);
     if (confirm(`Delete box specification "${b ? b.boxName : ''}"?`)) {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await deleteDoc(doc(db, 'users', user.uid, 'boxDetails', id));
       } else {
         const updated = boxDetails.filter(i => i.id !== id);
@@ -452,7 +461,7 @@ export const AppProvider = ({ children }) => {
   const saveOrderDoc = async (id, data) => {
     const clean = sanitizeForFirestore(data);
     if (id) {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await updateDoc(doc(db, 'users', user.uid, 'orders', id), clean);
       } else {
         const updated = orders.map(o => o.id === id ? { ...o, ...clean, id } : o);
@@ -460,7 +469,7 @@ export const AppProvider = ({ children }) => {
         saveLocalDemoState({ orders: updated });
       }
     } else {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await addDoc(collection(db, 'users', user.uid, 'orders'), clean);
       } else {
         const updated = [{ ...clean, id: 'o_' + Date.now() }, ...orders];
@@ -472,7 +481,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteOrderDoc = async (id) => {
     if (confirm('Delete this production order?')) {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await deleteDoc(doc(db, 'users', user.uid, 'orders', id));
       } else {
         const updated = orders.filter(i => i.id !== id);
@@ -486,7 +495,7 @@ export const AppProvider = ({ children }) => {
   const savePaymentDoc = async (id, data) => {
     const clean = sanitizeForFirestore(data);
     if (id) {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await updateDoc(doc(db, 'users', user.uid, 'paymentDetails', id), clean);
       } else {
         const updated = paymentDetails.map(p => p.id === id ? { ...p, ...clean, id } : p);
@@ -494,7 +503,7 @@ export const AppProvider = ({ children }) => {
         saveLocalDemoState({ paymentDetails: updated });
       }
     } else {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await addDoc(collection(db, 'users', user.uid, 'paymentDetails'), clean);
       } else {
         const updated = [{ ...clean, id: 'p_' + Date.now() }, ...paymentDetails];
@@ -506,7 +515,7 @@ export const AppProvider = ({ children }) => {
 
   const deletePaymentDoc = async (id) => {
     if (confirm('Delete this payment transaction record?')) {
-      if (!isDemoMode && db && user) {
+      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
         await deleteDoc(doc(db, 'users', user.uid, 'paymentDetails', id));
       } else {
         const updated = paymentDetails.filter(i => i.id !== id);
@@ -521,7 +530,7 @@ export const AppProvider = ({ children }) => {
       activeTab, setActiveTab,
       theme, toggleTheme,
       isDemoMode, isConnected, user,
-      loginWithGoogle, logout,
+      loginWithGoogle, startDemoMode, logout,
       factories, saveFactoryDoc, deleteFactoryDoc,
       customers, saveCustomerDoc, deleteCustomerDoc,
       boxDetails, saveBoxDoc, deleteBoxDoc,
