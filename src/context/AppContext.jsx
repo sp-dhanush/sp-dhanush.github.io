@@ -1,113 +1,111 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getUserSavedFirebaseConfig, saveFirebaseConfig, clearFirebaseConfig } from '../firebase-config';
+import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { getSavedFirebaseConfig } from '../firebase-config';
 
 const AppContext = createContext();
 
-const LOCAL_STORAGE_DEMO_KEY = 'factory_flow_v2_demo_data';
-
-const INITIAL_DEMO_DATA = {
+const initialDemoData = {
   factories: [
     {
       id: 'f_1',
       factoryName: 'Apex Packaging Pvt Ltd',
       contactPersonName: 'Rajesh Sharma',
       contactPersonNumber: '+91 98765 43210',
-      factoryAddress: 'Plot 42, Industrial Area Phase 2, Peenya, Bangalore-560058',
-      openingBalance: 25000.00
+      factoryAddress: 'Plot 42, GIDC Industrial Estate, Vadodara, Gujarat'
     },
     {
       id: 'f_2',
-      factoryName: 'JKW Packaging Solutions',
-      contactPersonName: 'Suresh Kumar',
-      contactPersonNumber: '+91 98868 31306',
-      factoryAddress: 'Gangondanahalli, Lakshmipura Post, Bangalore-562162',
-      openingBalance: 31500.00
+      factoryName: 'Surat Corrugation Works',
+      contactPersonName: 'Ketan Patel',
+      contactPersonNumber: '+91 98250 11223',
+      factoryAddress: 'Station Road, Sachin Industrial Area, Surat'
     }
   ],
   customers: [
     {
       id: 'c_1',
       customerName: 'Sun Pharma Industries',
-      contactPersonName: 'Anil Gupta',
-      contactPersonNumber: '+91 91234 56789',
-      customerAddress: 'Building B, Electronic City, Bangalore-560100'
+      customerAddress: '12 Corporate Park, Andheri East, Mumbai',
+      contactPersonName: 'Amit Verma',
+      contactPersonNumber: '+91 98123 45678'
     },
     {
       id: 'c_2',
-      customerName: 'PRAD 4x4 Accessories',
-      contactPersonName: 'Dhanush Gowda',
-      contactPersonNumber: '+91 99887 76655',
-      customerAddress: 'Koramangala 4th Block, Bangalore-560034'
+      customerName: 'Gujarat Agro Foods Ltd',
+      customerAddress: 'Highway Hub, Sanand, Ahmedabad',
+      contactPersonName: 'Suresh Patel',
+      contactPersonNumber: '+91 97234 56789'
     }
   ],
   boxDetails: [
     {
       id: 'b_1',
-      boxName: 'Z101 Radiator Guard Outer Box',
-      length: 610,
-      width: 95,
-      height: 1630,
+      boxName: '1kg Medicine Master Carton',
+      length: 350,
+      width: 250,
+      height: 200,
       unit: 'mm',
       category: 'Outer',
       ply: '5',
       paperGsm: '180 GSM',
-      paperBf: '18 BF',
-      openType: 'Over Flop',
-      rate: 210.00,
-      margin: 25.00,
-      note: 'Heavy duty corrugated export packaging',
+      paperBf: '24 BF',
+      openType: 'Regular',
+      rate: 45.00,
+      margin: 5.00,
+      note: 'Heavy duty outer carton with waterproof lining',
       photos: []
     },
     {
       id: 'b_2',
-      boxName: 'W502 Radiator Guard Inner Box',
-      length: 260,
-      width: 50,
-      height: 560,
+      boxName: '500g Inner Bottle Box',
+      length: 120,
+      width: 120,
+      height: 180,
       unit: 'mm',
       category: 'Inner',
-      ply: '5',
-      paperGsm: '180 GSM',
+      ply: '3',
+      paperGsm: '140 GSM',
       paperBf: '18 BF',
       openType: 'Over Flop',
-      rate: 33.00,
-      margin: 7.00,
-      note: 'Inner protective sleeve carton',
+      rate: 18.50,
+      margin: 2.50,
+      note: 'High stiffness inner folding carton',
       photos: []
     }
   ],
   orders: [
     {
       id: 'o_1',
+      customerId: 'c_1',
+      customerName: 'Sun Pharma Industries',
+      factoryId: 'f_1',
+      factoryName: 'Apex Packaging Pvt Ltd',
+      boxId: 'b_1',
+      boxName: '1kg Medicine Master Carton',
+      quantity: 5000,
+      orderDate: '2026-08-20',
+      deliveryDate: '2026-08-28',
+      notes: 'Dispatch via express cargo'
+    },
+    {
+      id: 'o_2',
       customerId: 'c_2',
-      customerName: 'PRAD 4x4 Accessories',
+      customerName: 'Gujarat Agro Foods Ltd',
       factoryId: 'f_2',
-      factoryName: 'JKW Packaging Solutions',
-      orderDate: '2026-08-18',
-      deliveryDate: '2026-08-26',
-      notes: 'Palletized cargo dispatch required',
-      items: [
-        {
-          boxId: 'b_1',
-          boxName: 'Z101 Radiator Guard Outer Box',
-          quantity: 800,
-          notes: 'Special Kraft paper print'
-        },
-        {
-          boxId: 'b_2',
-          boxName: 'W502 Radiator Guard Inner Box',
-          quantity: 2000,
-          notes: 'Standard bundle packing'
-        }
-      ]
+      factoryName: 'Surat Corrugation Works',
+      boxId: 'b_2',
+      boxName: '500g Inner Bottle Box',
+      quantity: 10000,
+      orderDate: '2026-08-22',
+      deliveryDate: '2026-08-30',
+      notes: 'Deliver directly to Sanand plant'
     }
   ],
   paymentDetails: [
     {
-      id: 'p_1',
+      id: 'pay_1',
       factoryId: 'f_1',
       factoryName: 'Apex Packaging Pvt Ltd',
       paymentDate: '2026-08-22',
@@ -120,10 +118,7 @@ const INITIAL_DEMO_DATA = {
 
 export const AppProvider = ({ children }) => {
   const getTabFromUrl = () => {
-    let path = window.location.hash.replace(/^#\/?/, '').toLowerCase();
-    if (!path) {
-      path = window.location.pathname.replace(/^\//, '').toLowerCase();
-    }
+    const path = window.location.pathname.replace(/^\//, '').toLowerCase();
     if (!path) return 'dashboard';
     if (path === 'products') return 'box-details';
     const validTabs = ['dashboard', 'factories', 'customers', 'box-details', 'orders', 'payments', 'reports'];
@@ -136,24 +131,20 @@ export const AppProvider = ({ children }) => {
     const resolvedTab = tab === 'products' ? 'box-details' : tab;
     setActiveTabState(resolvedTab);
     if (!skipPush) {
-      const hashPath = '#/' + resolvedTab;
-      if (window.location.hash !== hashPath) {
-        window.location.hash = hashPath;
+      const targetPath = '/' + resolvedTab;
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ tab: resolvedTab }, '', targetPath);
       }
     }
   };
 
   useEffect(() => {
-    const handleUrlChange = () => {
+    const handlePopState = () => {
       const tabFromUrl = getTabFromUrl();
       setActiveTabState(tabFromUrl);
     };
-    window.addEventListener('hashchange', handleUrlChange);
-    window.addEventListener('popstate', handleUrlChange);
-    return () => {
-      window.removeEventListener('hashchange', handleUrlChange);
-      window.removeEventListener('popstate', handleUrlChange);
-    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const getThemeCookie = () => {
@@ -188,7 +179,6 @@ export const AppProvider = ({ children }) => {
   const [activeModal, setActiveModal] = useState(null);
   const [modalPayload, setModalPayload] = useState(null);
   const [lightboxImg, setLightboxImg] = useState(null);
-  const [syncNotice, setSyncNotice] = useState(null);
 
   const unsubscribersRef = useRef([]);
 
@@ -197,122 +187,110 @@ export const AppProvider = ({ children }) => {
     unsubscribersRef.current = [];
   };
 
-  const loadLocalDemoState = () => {
-    try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_DEMO_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setFactories(parsed.factories || INITIAL_DEMO_DATA.factories);
-        setCustomers(parsed.customers || INITIAL_DEMO_DATA.customers);
-        setBoxDetails(parsed.boxDetails || INITIAL_DEMO_DATA.boxDetails);
-        setOrders(parsed.orders || INITIAL_DEMO_DATA.orders);
-        setPaymentDetails(parsed.paymentDetails || INITIAL_DEMO_DATA.paymentDetails);
-      } else {
-        localStorage.setItem(LOCAL_STORAGE_DEMO_KEY, JSON.stringify(INITIAL_DEMO_DATA));
-        setFactories(INITIAL_DEMO_DATA.factories);
-        setCustomers(INITIAL_DEMO_DATA.customers);
-        setBoxDetails(INITIAL_DEMO_DATA.boxDetails);
-        setOrders(INITIAL_DEMO_DATA.orders);
-        setPaymentDetails(INITIAL_DEMO_DATA.paymentDetails);
-      }
-    } catch (e) {
-      console.warn('LocalStorage error:', e);
-      setFactories(INITIAL_DEMO_DATA.factories);
-      setCustomers(INITIAL_DEMO_DATA.customers);
-      setBoxDetails(INITIAL_DEMO_DATA.boxDetails);
-      setOrders(INITIAL_DEMO_DATA.orders);
-      setPaymentDetails(INITIAL_DEMO_DATA.paymentDetails);
-    }
-  };
-
-  const saveLocalDemoState = (partial) => {
-    try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_DEMO_KEY);
-      const current = stored ? JSON.parse(stored) : INITIAL_DEMO_DATA;
-      const updated = { ...current, ...partial };
-      localStorage.setItem(LOCAL_STORAGE_DEMO_KEY, JSON.stringify(updated));
-    } catch (e) {
-      console.warn('Failed to save to localStorage:', e);
-    }
-  };
-
-  // Initialize Firebase if configured
   useEffect(() => {
-    const config = getUserSavedFirebaseConfig();
-    if (config) {
+    initFirebase();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const initFirebase = () => {
+    detachListeners();
+    const config = getSavedFirebaseConfig();
+    if (config.apiKey && config.projectId) {
       try {
-        let app;
-        if (!getApps().length) {
-          app = initializeApp(config);
-        } else {
-          app = getApps()[0];
-        }
-        const firestore = getFirestore(app);
-        const firebaseAuth = getAuth(app);
+        let app = getApps().length === 0 ? initializeApp(config) : getApps()[0];
+        let firebaseAuth = getAuth(app);
+        let firebaseDb = getFirestore(app);
 
-        setDb(firestore);
         setAuth(firebaseAuth);
-        setIsDemoMode(false);
+        setDb(firebaseDb);
         setIsConnected(true);
+        setIsDemoMode(false);
 
-        const unsubAuth = onAuthStateChanged(firebaseAuth, (usr) => {
-          setUser(usr);
-          if (usr) {
-            attachFirestoreListeners(firestore, usr.uid);
+        onAuthStateChanged(firebaseAuth, (currentUser) => {
+          setUser(currentUser);
+          detachListeners();
+          if (currentUser) {
+            loadFirestore(firebaseDb, currentUser.uid);
           } else {
-            detachListeners();
-            loadLocalDemoState();
+            setFactories([]);
+            setCustomers([]);
+            setBoxDetails([]);
+            setOrders([]);
+            setPaymentDetails([]);
           }
         });
 
-        return () => {
-          unsubAuth();
-          detachListeners();
-        };
-      } catch (err) {
-        console.error('Firebase init error:', err);
-        setSyncNotice('Firebase connection failed. Falling back to local offline mode.');
-        setIsDemoMode(true);
-        setIsConnected(false);
-        loadLocalDemoState();
+        return;
+      } catch (e) {
+        console.warn('Firebase init failed, switching to demo mode', e);
       }
-    } else {
-      setIsDemoMode(true);
-      setIsConnected(false);
-      loadLocalDemoState();
     }
-  }, []);
-
-  const attachFirestoreListeners = (firestoreDb, uid) => {
-    detachListeners();
-
-    const collectionsToSync = [
-      { name: 'factories', setter: setFactories },
-      { name: 'customers', setter: setCustomers },
-      { name: 'boxDetails', setter: setBoxDetails },
-      { name: 'orders', setter: setOrders },
-      { name: 'paymentDetails', setter: setPaymentDetails }
-    ];
-
-    collectionsToSync.forEach(({ name, setter }) => {
-      const colRef = collection(firestoreDb, 'users', uid, name);
-      const unsub = onSnapshot(colRef, (snapshot) => {
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setter(docs);
-      }, (err) => {
-        console.error(`Error listening to ${name}:`, err);
-      });
-      unsubscribersRef.current.push(unsub);
-    });
+    loadDemoMode();
   };
 
-  const startDemoMode = () => {
-    setUser({
-      uid: 'demo_user',
-      displayName: 'Demo Executive',
-      email: 'demo@factoryflow.local'
-    });
-    loadLocalDemoState();
+  const loadDemoMode = () => {
+    detachListeners();
+    setIsDemoMode(true);
+    setIsConnected(false);
+    const local = localStorage.getItem('factory_flow_v2_demo_data');
+    if (local) {
+      try {
+        const parsed = JSON.parse(local);
+        setFactories(parsed.factories || initialDemoData.factories);
+        setCustomers(parsed.customers || initialDemoData.customers);
+        setBoxDetails(parsed.boxDetails || initialDemoData.boxDetails);
+        setOrders(parsed.orders || initialDemoData.orders);
+        setPaymentDetails(parsed.paymentDetails || initialDemoData.paymentDetails);
+        return;
+      } catch (e) {
+        console.warn('Local demo data parse error', e);
+      }
+    }
+    setFactories(initialDemoData.factories);
+    setCustomers(initialDemoData.customers);
+    setBoxDetails(initialDemoData.boxDetails);
+    setOrders(initialDemoData.orders);
+    setPaymentDetails(initialDemoData.paymentDetails);
+  };
+
+  const saveLocalDemoState = (partial) => {
+    const current = { factories, customers, boxDetails, orders, paymentDetails, ...partial };
+    localStorage.setItem('factory_flow_v2_demo_data', JSON.stringify(current));
+  };
+
+  const [syncNotice, setSyncNotice] = useState(null);
+
+  const loadFirestore = (firestoreDb, userId) => {
+    if (!userId) return;
+    detachListeners();
+
+    const errHandler = (err) => {
+      console.warn('Firestore snapshot error', err);
+      setSyncNotice('Cloud sync issue detected. Operating in local demo mode.');
+      loadDemoMode();
+    };
+
+    const unsubFact = onSnapshot(collection(firestoreDb, 'users', userId, 'factories'), snap => {
+      setFactories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, errHandler);
+
+    const unsubCust = onSnapshot(collection(firestoreDb, 'users', userId, 'customers'), snap => {
+      setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, errHandler);
+
+    const unsubBox = onSnapshot(collection(firestoreDb, 'users', userId, 'boxDetails'), snap => {
+      setBoxDetails(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, errHandler);
+
+    const unsubOrd = onSnapshot(collection(firestoreDb, 'users', userId, 'orders'), snap => {
+      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, errHandler);
+
+    const unsubPay = onSnapshot(collection(firestoreDb, 'users', userId, 'paymentDetails'), snap => {
+      setPaymentDetails(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, errHandler);
+
+    unsubscribersRef.current = [unsubFact, unsubCust, unsubBox, unsubOrd, unsubPay];
   };
 
   const loginWithGoogle = async () => {
@@ -324,7 +302,7 @@ export const AppProvider = ({ children }) => {
         alert('Google Sign-in failed: ' + e.message);
       }
     } else {
-      setActiveModal('firebase');
+      alert('Please configure your Firebase credentials first!');
     }
   };
 
@@ -356,7 +334,7 @@ export const AppProvider = ({ children }) => {
   const saveFactoryDoc = async (id, data) => {
     const clean = sanitizeForFirestore(data);
     if (id) {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await updateDoc(doc(db, 'users', user.uid, 'factories', id), clean);
       } else {
         const updated = factories.map(f => f.id === id ? { ...f, ...clean, id } : f);
@@ -364,7 +342,7 @@ export const AppProvider = ({ children }) => {
         saveLocalDemoState({ factories: updated });
       }
     } else {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await addDoc(collection(db, 'users', user.uid, 'factories'), clean);
       } else {
         const updated = [{ ...clean, id: 'f_' + Date.now() }, ...factories];
@@ -377,7 +355,7 @@ export const AppProvider = ({ children }) => {
   const deleteFactoryDoc = async (id) => {
     const f = factories.find(i => i.id === id);
     if (confirm(`Delete factory "${f ? f.factoryName : ''}"?`)) {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await deleteDoc(doc(db, 'users', user.uid, 'factories', id));
       } else {
         const updated = factories.filter(i => i.id !== id);
@@ -391,7 +369,7 @@ export const AppProvider = ({ children }) => {
   const saveCustomerDoc = async (id, data) => {
     const clean = sanitizeForFirestore(data);
     if (id) {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await updateDoc(doc(db, 'users', user.uid, 'customers', id), clean);
       } else {
         const updated = customers.map(c => c.id === id ? { ...c, ...clean, id } : c);
@@ -399,7 +377,7 @@ export const AppProvider = ({ children }) => {
         saveLocalDemoState({ customers: updated });
       }
     } else {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await addDoc(collection(db, 'users', user.uid, 'customers'), clean);
       } else {
         const updated = [{ ...clean, id: 'c_' + Date.now() }, ...customers];
@@ -412,7 +390,7 @@ export const AppProvider = ({ children }) => {
   const deleteCustomerDoc = async (id) => {
     const c = customers.find(i => i.id === id);
     if (confirm(`Delete customer "${c ? c.customerName : ''}"?`)) {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await deleteDoc(doc(db, 'users', user.uid, 'customers', id));
       } else {
         const updated = customers.filter(i => i.id !== id);
@@ -426,7 +404,7 @@ export const AppProvider = ({ children }) => {
   const saveBoxDoc = async (id, data) => {
     const clean = sanitizeForFirestore(data);
     if (id) {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await updateDoc(doc(db, 'users', user.uid, 'boxDetails', id), clean);
       } else {
         const updated = boxDetails.map(b => b.id === id ? { ...b, ...clean, id } : b);
@@ -434,7 +412,7 @@ export const AppProvider = ({ children }) => {
         saveLocalDemoState({ boxDetails: updated });
       }
     } else {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await addDoc(collection(db, 'users', user.uid, 'boxDetails'), clean);
       } else {
         const updated = [{ ...clean, id: 'b_' + Date.now() }, ...boxDetails];
@@ -447,7 +425,7 @@ export const AppProvider = ({ children }) => {
   const deleteBoxDoc = async (id) => {
     const b = boxDetails.find(i => i.id === id);
     if (confirm(`Delete box specification "${b ? b.boxName : ''}"?`)) {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await deleteDoc(doc(db, 'users', user.uid, 'boxDetails', id));
       } else {
         const updated = boxDetails.filter(i => i.id !== id);
@@ -461,7 +439,7 @@ export const AppProvider = ({ children }) => {
   const saveOrderDoc = async (id, data) => {
     const clean = sanitizeForFirestore(data);
     if (id) {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await updateDoc(doc(db, 'users', user.uid, 'orders', id), clean);
       } else {
         const updated = orders.map(o => o.id === id ? { ...o, ...clean, id } : o);
@@ -469,7 +447,7 @@ export const AppProvider = ({ children }) => {
         saveLocalDemoState({ orders: updated });
       }
     } else {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await addDoc(collection(db, 'users', user.uid, 'orders'), clean);
       } else {
         const updated = [{ ...clean, id: 'o_' + Date.now() }, ...orders];
@@ -480,8 +458,9 @@ export const AppProvider = ({ children }) => {
   };
 
   const deleteOrderDoc = async (id) => {
-    if (confirm('Delete this production order?')) {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+    const o = orders.find(i => i.id === id);
+    if (confirm(`Delete order for "${o ? o.boxName : ''}"?`)) {
+      if (!isDemoMode && db && user) {
         await deleteDoc(doc(db, 'users', user.uid, 'orders', id));
       } else {
         const updated = orders.filter(i => i.id !== id);
@@ -491,11 +470,11 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // 5. Payment Details Operations
+  // 5. Payment Operations
   const savePaymentDoc = async (id, data) => {
     const clean = sanitizeForFirestore(data);
     if (id) {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await updateDoc(doc(db, 'users', user.uid, 'paymentDetails', id), clean);
       } else {
         const updated = paymentDetails.map(p => p.id === id ? { ...p, ...clean, id } : p);
@@ -503,10 +482,10 @@ export const AppProvider = ({ children }) => {
         saveLocalDemoState({ paymentDetails: updated });
       }
     } else {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+      if (!isDemoMode && db && user) {
         await addDoc(collection(db, 'users', user.uid, 'paymentDetails'), clean);
       } else {
-        const updated = [{ ...clean, id: 'p_' + Date.now() }, ...paymentDetails];
+        const updated = [{ ...clean, id: 'pay_' + Date.now() }, ...paymentDetails];
         setPaymentDetails(updated);
         saveLocalDemoState({ paymentDetails: updated });
       }
@@ -514,8 +493,8 @@ export const AppProvider = ({ children }) => {
   };
 
   const deletePaymentDoc = async (id) => {
-    if (confirm('Delete this payment transaction record?')) {
-      if (!isDemoMode && db && user && user.uid !== 'demo_user') {
+    if (confirm(`Delete payment transaction?`)) {
+      if (!isDemoMode && db && user) {
         await deleteDoc(doc(db, 'users', user.uid, 'paymentDetails', id));
       } else {
         const updated = paymentDetails.filter(i => i.id !== id);
@@ -529,17 +508,19 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider value={{
       activeTab, setActiveTab,
       theme, toggleTheme,
-      isDemoMode, isConnected, user,
-      loginWithGoogle, startDemoMode, logout,
-      factories, saveFactoryDoc, deleteFactoryDoc,
-      customers, saveCustomerDoc, deleteCustomerDoc,
-      boxDetails, saveBoxDoc, deleteBoxDoc,
-      orders, saveOrderDoc, deleteOrderDoc,
-      paymentDetails, savePaymentDoc, deletePaymentDoc,
+      isDemoMode, setIsDemoMode,
+      isConnected, syncNotice, setSyncNotice,
+      user, loginWithGoogle, logout,
+      factories, customers, boxDetails, products: boxDetails, orders, paymentDetails,
       activeModal, setActiveModal,
       modalPayload, setModalPayload,
       lightboxImg, setLightboxImg,
-      syncNotice, setSyncNotice
+      saveFactoryDoc, deleteFactoryDoc,
+      saveCustomerDoc, deleteCustomerDoc,
+      saveBoxDoc, deleteBoxDoc, saveProductDoc: saveBoxDoc, deleteProductDoc: deleteBoxDoc,
+      saveOrderDoc, deleteOrderDoc,
+      savePaymentDoc, deletePaymentDoc,
+      reloadFirebase: () => initFirebase()
     }}>
       {children}
     </AppContext.Provider>
