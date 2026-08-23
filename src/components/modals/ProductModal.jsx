@@ -15,12 +15,13 @@ export const ProductModal = () => {
   const [unit, setUnit] = useState(p.unit || 'mm');
   const [ply, setPly] = useState(p.ply || '5-ply');
   const [gsmBf, setGsmBf] = useState(p.gsmBf || '');
+  const [type, setType] = useState(p.type || p.boxType || 'Regular');
   const [factoryRate, setFactoryRate] = useState(p.factoryRate !== undefined ? p.factoryRate : (p.factoryRatePerBox !== undefined ? p.factoryRatePerBox : ''));
   const [extraMargin, setExtraMargin] = useState(p.extraMargin !== undefined ? p.extraMargin : (p.extraMarginPerBox !== undefined ? p.extraMarginPerBox : ''));
   const [notes, setNotes] = useState(p.notes || p.note || '');
   const [photos, setPhotos] = useState(p.photos || p.referencePhotos || []);
 
-  const autoSentence = generateBoxDescription({ productName, length: len, width: wid, height: hei, unit, ply, gsmBf });
+  const autoSentence = generateBoxDescription({ productName, length: len, width: wid, height: hei, unit, ply, gsmBf, type });
 
   const handlePhotoSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -49,6 +50,7 @@ export const ProductModal = () => {
       unit,
       ply,
       gsmBf,
+      type,
       factoryRate: parseFloat(factoryRate) || 0,
       extraMargin: parseFloat(extraMargin) || 0,
       notes: notes.trim(),
@@ -117,6 +119,14 @@ export const ProductModal = () => {
               <div className="form-group">
                 <label>Paper GSM / BF</label>
                 <input type="text" value={gsmBf} onChange={e => setGsmBf(e.target.value)} placeholder="e.g. 180 GSM 24 BF" />
+              </div>
+              <div className="form-group">
+                <label>Type</label>
+                <select value={type} onChange={e => setType(e.target.value)}>
+                  <option value="Regular">Regular</option>
+                  <option value="Over Flop">Over Flop</option>
+                  <option value="Default">Default</option>
+                </select>
               </div>
             </div>
 

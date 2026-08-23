@@ -11,6 +11,7 @@ export const Products = () => {
     const matchSearch = p.productName.toLowerCase().includes(search.toLowerCase()) || 
                         (p.customerName || '').toLowerCase().includes(search.toLowerCase()) || 
                         (p.description || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (p.type || p.boxType || '').toLowerCase().includes(search.toLowerCase()) ||
                         (p.notes || p.note || '').toLowerCase().includes(search.toLowerCase());
     const matchCust = !customerFilter || p.customerId === customerFilter;
     return matchSearch && matchCust;
@@ -59,6 +60,7 @@ export const Products = () => {
                 <th>Dimensions (L×W×H)</th>
                 <th>Ply</th>
                 <th>GSM / BF</th>
+                <th>Type</th>
                 <th>Factory Rate / Box (₹)</th>
                 <th>My Extra Margin / Box (₹)</th>
                 <th>Notes</th>
@@ -70,7 +72,7 @@ export const Products = () => {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className="text-center py-4 text-muted">
+                  <td colSpan="12" className="text-center py-4 text-muted">
                     No product specifications found. Click "+ Add Product Specification" to create one.
                   </td>
                 </tr>
@@ -81,6 +83,7 @@ export const Products = () => {
                   const eMargin = p.extraMargin !== undefined ? p.extraMargin : p.extraMarginPerBox;
                   const itemNotes = p.notes || p.note;
                   const photoList = p.photos || p.referencePhotos || [];
+                  const itemType = p.type !== undefined && p.type !== null ? p.type : p.boxType;
 
                   return (
                     <tr key={p.id}>
@@ -89,6 +92,7 @@ export const Products = () => {
                       <td className="tabular-nums">{p.length}×{p.width}×{p.height} {p.unit}</td>
                       <td><span className="badge bg-info text-dark rounded-pill">{p.ply}</span></td>
                       <td>{p.gsmBf || '-'}</td>
+                      <td>{itemType ? <span className="badge bg-secondary rounded-pill">{itemType}</span> : '-'}</td>
                       <td className="tabular-nums">{fRate ? formatINR(fRate) : '-'}</td>
                       <td className="tabular-nums text-success fw-bold">{eMargin ? formatINR(eMargin) : '-'}</td>
                       <td style={{ fontSize: '0.8rem', color: 'var(--bs-secondary-color)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={itemNotes || ''}>

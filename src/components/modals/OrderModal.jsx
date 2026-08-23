@@ -20,6 +20,7 @@ export const OrderModal = () => {
   const [unit, setUnit] = useState(item.boxSpecs?.unit || 'mm');
   const [ply, setPly] = useState(item.boxSpecs?.ply || '5-ply');
   const [gsmBf, setGsmBf] = useState(item.boxSpecs?.gsmBf || '');
+  const [type, setType] = useState(item.boxSpecs?.type || item.boxSpecs?.boxType || 'Regular');
 
   const [quantity, setQuantity] = useState(item.quantity !== undefined ? item.quantity : '');
   const [factoryRate, setFactoryRate] = useState(item.factoryUnitCost !== undefined ? item.factoryUnitCost : '');
@@ -64,6 +65,7 @@ export const OrderModal = () => {
       setUnit(p.unit || 'mm');
       setPly(p.ply || '3-ply');
       setGsmBf(p.gsmBf || '');
+      setType(p.type || p.boxType || 'Regular');
       if (p.factoryRate !== undefined || p.factoryRatePerBox !== undefined) {
         setFactoryRate(p.factoryRate !== undefined ? p.factoryRate : p.factoryRatePerBox);
       }
@@ -133,7 +135,7 @@ export const OrderModal = () => {
   const totalCustomerBill = customerRate * numQty;
   const totalFactoryCost = numRate * numQty;
   const profitMargin = numMargin * numQty;
-  const generatedDesc = generateBoxDescription({ productName, length: len, width: wid, height: hei, unit, ply, gsmBf });
+  const generatedDesc = generateBoxDescription({ productName, length: len, width: wid, height: hei, unit, ply, gsmBf, type });
 
   // Handle status select change
   const handleMarginStatusChange = (newStatus) => {
@@ -183,6 +185,7 @@ export const OrderModal = () => {
         unit,
         ply,
         gsmBf,
+        type,
         description: generatedDesc,
         printing: ''
       },
@@ -293,6 +296,14 @@ export const OrderModal = () => {
               <div className="form-group">
                 <label>Paper GSM / BF Spec</label>
                 <input type="text" value={gsmBf} onChange={e => setGsmBf(e.target.value)} placeholder="e.g. 180 GSM 24 BF" />
+              </div>
+              <div className="form-group">
+                <label>Box Type</label>
+                <select value={type} onChange={e => setType(e.target.value)}>
+                  <option value="Regular">Regular</option>
+                  <option value="Over Flop">Over Flop</option>
+                  <option value="Default">Default</option>
+                </select>
               </div>
             </div>
 
