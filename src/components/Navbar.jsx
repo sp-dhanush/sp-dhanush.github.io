@@ -13,7 +13,7 @@ export const Navbar = () => {
   return (
     <header className="navbar navbar-expand-lg border-bottom sticky-top shadow-sm" style={{ background: 'var(--nav-bg)', backdropFilter: 'blur(12px)', zIndex: 1050 }}>
       <div className="container-fluid px-3 px-md-4">
-        <a href="/dashboard" className="d-flex align-items-center gap-2 brand me-lg-4 me-xl-5 text-decoration-none" onClick={(e) => { e.preventDefault(); handleTabClick('dashboard'); }}>
+        <a href="#/dashboard" className="d-flex align-items-center gap-2 brand me-lg-4 me-xl-5 text-decoration-none" onClick={(e) => { e.preventDefault(); handleTabClick('dashboard'); }}>
           <div className="brand-icon">
             <i className="bi bi-box-seam-fill text-white fs-5"></i>
           </div>
@@ -23,31 +23,31 @@ export const Navbar = () => {
         {/* Navigation Items (Only visible when user is logged in) */}
         {user && (
           <nav className={`nav-links ms-lg-2 ms-xl-3 ${mobileMenuOpen ? 'open' : ''}`}>
-            <a href="/dashboard" className={`nav-btn btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('dashboard'); }}>
+            <a href="#/dashboard" className={`nav-btn btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('dashboard'); }}>
               <i className="bi bi-grid-fill me-1"></i>
               Dashboard
             </a>
-            <a href="/factories" className={`nav-btn btn ${activeTab === 'factories' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('factories'); }}>
+            <a href="#/factories" className={`nav-btn btn ${activeTab === 'factories' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('factories'); }}>
               <i className="bi bi-building-gear me-1"></i>
               Factories
             </a>
-            <a href="/customers" className={`nav-btn btn ${activeTab === 'customers' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('customers'); }}>
+            <a href="#/customers" className={`nav-btn btn ${activeTab === 'customers' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('customers'); }}>
               <i className="bi bi-people-fill me-1"></i>
               Customers
             </a>
-            <a href="/box-details" className={`nav-btn btn ${activeTab === 'products' || activeTab === 'box-details' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('box-details'); }}>
+            <a href="#/box-details" className={`nav-btn btn ${activeTab === 'products' || activeTab === 'box-details' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('box-details'); }}>
               <i className="bi bi-box-seam-fill me-1"></i>
               Box Details
             </a>
-            <a href="/orders" className={`nav-btn btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('orders'); }}>
+            <a href="#/orders" className={`nav-btn btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('orders'); }}>
               <i className="bi bi-bag-check-fill me-1"></i>
               Orders
             </a>
-            <a href="/payments" className={`nav-btn btn ${activeTab === 'payments' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('payments'); }}>
+            <a href="#/payments" className={`nav-btn btn ${activeTab === 'payments' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('payments'); }}>
               <i className="bi bi-credit-card-2-front-fill me-1"></i>
               Payments
             </a>
-            <a href="/reports" className={`nav-btn btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('reports'); }}>
+            <a href="#/reports" className={`nav-btn btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('reports'); }}>
               <i className="bi bi-bar-chart-line-fill me-1"></i>
               Reports
             </a>
