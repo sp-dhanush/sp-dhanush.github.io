@@ -48,8 +48,8 @@ export const FirebaseModal = () => {
   };
 
   return (
-    <div className="modal-backdrop" onClick={(e) => e.target.classList.contains('modal-backdrop') && setActiveModal(null)}>
-      <div className="modal d-block position-relative shadow-lg rounded-4 overflow-hidden" style={{ maxWidth: 600 }}>
+    <div className="modal-backdrop d-flex align-items-center justify-content-center" onClick={(e) => e.target.classList.contains('modal-backdrop') && setActiveModal(null)}>
+      <div className="modal-card modal d-block position-relative shadow-lg rounded-4 overflow-hidden" style={{ maxWidth: 600 }}>
         <div className="modal-header border-bottom">
           <h5 className="modal-title fw-bold font-outfit d-flex align-items-center gap-2">
             <i className="bi bi-gear-fill text-primary"></i>

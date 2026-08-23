@@ -7,8 +7,8 @@ export const LightboxModal = () => {
   if (!lightboxImg) return null;
 
   return (
-    <div className="modal-backdrop" onClick={() => setLightboxImg(null)}>
-      <div className="modal" style={{ maxWidth: 800, background: 'rgba(10,15,25,0.95)' }}>
+    <div className="modal-backdrop d-flex align-items-center justify-content-center" onClick={() => setLightboxImg(null)}>
+      <div className="modal-card modal d-block position-relative shadow-lg" style={{ maxWidth: 800, background: 'rgba(10,15,25,0.95)' }}>
         <div className="modal-header">
           <h3>Photo Preview</h3>
           <button className="close-btn" onClick={() => setLightboxImg(null)}>&times;</button>

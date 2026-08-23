@@ -1,126 +1,247 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { exportPDFStatement } from '../utils/pdfExporter';
+import { exportFactoryStatementPDF } from '../utils/pdfExporter';
 import { formatINR } from '../utils/helpers';
 
 export const Reports = () => {
-  const { factories, orders, transactions } = useApp();
+  const { factories, customers, orders, boxDetails, paymentDetails } = useApp();
   const [selectedFactoryId, setSelectedFactoryId] = useState(factories[0]?.id || '');
-  const [monthStr, setMonthStr] = useState('2026-08');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [monthStr, setMonthStr] = useState('');
 
-  const selectedFactory = factories.find(f => f.id === selectedFactoryId) || factories[0];
-  const monthOrders = orders.filter(o => o.factoryId === (selectedFactory ? selectedFactory.id : '') && o.orderDate.startsWith(monthStr));
+  const selectedFactory = factories.find(f => f.id === selectedFactoryId);
+  const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
-  let totalCost = 0;
-  monthOrders.forEach(o => totalCost += (o.totalFactoryCost || 0));
+  const openingBal = selectedFactory
+    ? (parseFloat(selectedFactory.openingBalance) || parseFloat(selectedFactory.currentBalance) || 0)
+    : 0;
 
-  let totalPaid = 0;
-  transactions
-    .filter(t => t.type === 'factory_payout' && t.entityId === (selectedFactory ? selectedFactory.id : '') && t.date.startsWith(monthStr))
-    .forEach(t => totalPaid += (t.amount || 0));
+  const factoryOrders = orders.filter(o => {
+    const matchFact = !selectedFactoryId || o.factoryId === selectedFactoryId;
+    const matchCust = !selectedCustomerId || o.customerId === selectedCustomerId;
+    const matchMonth = !monthStr || (o.orderDate && o.orderDate.startsWith(monthStr));
+    return matchFact && matchCust && matchMonth;
+  });
 
-  const netBalance = totalCost - totalPaid;
+  const factoryPayments = paymentDetails.filter(p => {
+    const matchFact = !selectedFactoryId || p.factoryId === selectedFactoryId;
+    const matchMonth = !monthStr || (p.paymentDate && p.paymentDate.startsWith(monthStr));
+    return matchFact && matchMonth;
+  });
+
+  let totalMarginEarned = 0;
+  factoryOrders.forEach(o => {
+    const items = Array.isArray(o.items) && o.items.length > 0
+      ? o.items
+      : [{ boxId: o.boxId, quantity: o.quantity }];
+
+    items.forEach(it => {
+      const b = boxDetails.find(box => box.id === it.boxId) || {};
+      const margin = parseFloat(b.margin) || 0;
+      const qty = parseInt(it.quantity) || 0;
+      totalMarginEarned += margin * qty;
+    });
+  });
+
+  let totalPaymentsSettled = 0;
+  factoryPayments.forEach(p => totalPaymentsSettled += (parseFloat(p.amountPaid) || 0));
+
+  const netPendingCommission = openingBal + totalMarginEarned - totalPaymentsSettled;
 
   const handleDownloadPDF = () => {
-    if (selectedFactory) {
-      exportPDFStatement({ factory: selectedFactory, monthStr, orders, transactions });
-    }
+    exportFactoryStatementPDF({
+      factory: selectedFactory || { factoryName: 'All Factories Margin Statement' },
+      monthStr,
+      factoryOrders,
+      factoryPayments,
+      boxDetails
+    });
   };
 
   return (
     <section id="tab-reports" className="tab-content active">
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <div className="fs-5 fw-bold font-outfit">Monthly Factory Statement & PDF Generator</div>
+        <div>
+          <div className="fs-4 fw-bold font-outfit">Brokerage Margin Reports & Statements</div>
+          <div className="text-muted small">Live calculation of margin commissions owed by factories to you</div>
+        </div>
         <button className="btn btn-success d-flex align-items-center gap-2 rounded-3 px-3 py-2 shadow-sm" onClick={handleDownloadPDF}>
           <i className="bi bi-file-earmark-pdf-fill fs-5"></i>
-          <span>Download PDF Statement</span>
+          <span>Download Margin Statement PDF</span>
         </button>
       </div>
 
+      {/* 3-Column Filter Panel */}
       <div className="card border-0 shadow-sm rounded-3 p-3 mb-4 bg-body-tertiary">
         <div className="row g-3 align-items-end">
-          <div className="col-12 col-md-6">
-            <label className="form-label text-uppercase small fw-bold text-muted">Select Factory</label>
+          <div className="col-12 col-md-4">
+            <label className="form-label text-uppercase small fw-bold text-muted">Select Manufacturing Factory</label>
             <select className="form-select" value={selectedFactoryId} onChange={(e) => setSelectedFactoryId(e.target.value)}>
-              {factories.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              <option value="">-- All Factories --</option>
+              {factories.map(f => <option key={f.id} value={f.id}>{f.factoryName}</option>)}
             </select>
           </div>
-          <div className="col-12 col-md-6">
-            <label className="form-label text-uppercase small fw-bold text-muted">Select Month & Year</label>
+          <div className="col-12 col-md-4">
+            <label className="form-label text-uppercase small fw-bold text-muted">Select Customer</label>
+            <select className="form-select" value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)}>
+              <option value="">-- All Customers --</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.customerName}</option>)}
+            </select>
+          </div>
+          <div className="col-12 col-md-4">
+            <label className="form-label text-uppercase small fw-bold text-muted">Filter Month (Optional)</label>
             <input type="month" className="form-control" value={monthStr} onChange={(e) => setMonthStr(e.target.value)} />
           </div>
         </div>
       </div>
 
-      <div id="report-paper-container" className="report-paper">
-        <div className="report-header">
-          <div>
-            <div className="report-title">{selectedFactory ? selectedFactory.name : 'Factory Statement'}</div>
-            <div style={{ color: '#6b7280', fontSize: '0.9rem' }}>{selectedFactory?.address || 'Carton Box Monthly Ledger Statement'}</div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#111827' }}>{monthStr}</div>
-            <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Generated: {new Date().toLocaleDateString('en-IN')}</div>
+      {/* Active Filter Indicators */}
+      {(selectedFactory || selectedCustomer || monthStr) && (
+        <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
+          <span className="small text-muted fw-semibold me-1">Active Filters:</span>
+          {selectedFactory && (
+            <span className="badge bg-primary-subtle text-primary border border-primary-subtle">
+              Factory: {selectedFactory.factoryName}
+            </span>
+          )}
+          {selectedCustomer && (
+            <span className="badge bg-info-subtle text-info border border-info-subtle">
+              Customer: {selectedCustomer.customerName}
+            </span>
+          )}
+          {monthStr && (
+            <span className="badge bg-warning-subtle text-warning border border-warning-subtle">
+              Month: {monthStr}
+            </span>
+          )}
+          <button className="btn btn-link btn-sm text-decoration-none p-0 ms-2" onClick={() => { setSelectedFactoryId(''); setSelectedCustomerId(''); setMonthStr(''); }}>
+            Clear Filters
+          </button>
+        </div>
+      )}
+
+      {/* Primary KPI Cards (Focused on Margin Commission) */}
+      <div className="row row-cols-1 row-cols-md-3 g-3 mb-4">
+        <div className="col">
+          <div className="card border-0 shadow-sm p-3 bg-body-tertiary rounded-3 border-start border-4 border-primary">
+            <div className="text-muted small mb-1 text-uppercase fw-bold">Total Margin Commission Earned</div>
+            <div className="fs-3 fw-bold tabular-nums font-outfit text-primary">{formatINR(totalMarginEarned)}</div>
+            <div className="small text-muted mt-1">Calculated from {factoryOrders.length} matching orders</div>
           </div>
         </div>
+        <div className="col">
+          <div className="card border-0 shadow-sm p-3 bg-body-tertiary rounded-3 border-start border-4 border-success">
+            <div className="text-muted small mb-1 text-uppercase fw-bold">Payments Received from Factory</div>
+            <div className="fs-3 fw-bold tabular-nums font-outfit text-success">{formatINR(totalPaymentsSettled)}</div>
+            <div className="small text-muted mt-1">{factoryPayments.length} payment settlements recorded</div>
+          </div>
+        </div>
+        <div className="col">
+          <div className="card border-0 shadow-sm p-3 bg-body-tertiary rounded-3 border-start border-4 border-warning">
+            <div className="text-muted small mb-1 text-uppercase fw-bold">Net Commission Pending Owed</div>
+            <div className={`fs-3 fw-bold tabular-nums font-outfit ${netPendingCommission > 0 ? 'text-warning' : 'text-success'}`}>
+              {formatINR(netPendingCommission)}
+            </div>
+            <div className="small text-muted mt-1">
+              {openingBal > 0 ? `Includes ${formatINR(openingBal)} initial opening balance` : (netPendingCommission > 0 ? 'Pending payout owed by factory' : 'Fully settled')}
+            </div>
+          </div>
+        </div>
+      </div>
 
-        <table className="report-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Order #</th>
-              <th>Customer</th>
-              <th>Box Specs</th>
-              <th>Quantity</th>
-              <th>Unit Rate (₹)</th>
-              <th>Total Cost (₹)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {monthOrders.length === 0 ? (
+      {/* Orders Margin Breakdown Table */}
+      <div className="card border-0 shadow-sm rounded-3 overflow-hidden mb-4">
+        <div className="p-3 bg-body-tertiary border-bottom d-flex justify-content-between align-items-center">
+          <div className="fw-bold font-outfit fs-6">Orders Margin Commission Breakdown</div>
+          <span className="badge bg-secondary">{factoryOrders.length} Orders</span>
+        </div>
+        <div className="table-responsive">
+          <table className="table table-hover align-middle mb-0">
+            <thead className="table-dark">
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '1.5rem', color: '#6b7280' }}>
-                  No factory orders recorded for {monthStr}.
-                </td>
+                <th>Order Date</th>
+                <th>Customer</th>
+                <th>Factory</th>
+                <th>Box Name</th>
+                <th>Specs</th>
+                <th>Quantity</th>
+                <th>My Margin / Box (₹)</th>
+                <th>Total Margin Earned (₹)</th>
               </tr>
-            ) : (
-              monthOrders.map(o => {
-                const specStr = `${o.boxSpecs.length}×${o.boxSpecs.width}×${o.boxSpecs.height} ${o.boxSpecs.unit}, ${o.boxSpecs.ply}`;
-                return (
-                  <tr key={o.id}>
-                    <td>{o.orderDate}</td>
-                    <td><strong>{o.orderNumber}</strong></td>
-                    <td>{o.customerName}</td>
-                    <td>{specStr}</td>
-                    <td style={{ textAlign: 'right' }}>{o.quantity.toLocaleString('en-IN')}</td>
-                    <td style={{ textAlign: 'right' }}>₹{o.factoryUnitCost.toFixed(2)}</td>
-                    <td style={{ textAlign: 'right' }}><strong>{formatINR(o.totalFactoryCost)}</strong></td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {factoryOrders.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="text-center py-4 text-muted">No orders matching current filter criteria.</td>
+                </tr>
+              ) : (
+                factoryOrders.map(o => {
+                  const items = Array.isArray(o.items) && o.items.length > 0
+                    ? o.items
+                    : [{ boxId: o.boxId, boxName: o.boxName, quantity: o.quantity }];
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '2px dashed #e5e7eb' }}>
-          <div style={{ maxWidth: 300 }}>
-            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#374151', marginBottom: '0.5rem' }}>Payment Terms & Notes</div>
-            <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Please inspect statement balance. Direct all queries regarding order quantities or rates within 7 days.</div>
-          </div>
-          <div style={{ width: 280 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontSize: '0.9rem' }}>
-              <span>Total Supply Cost:</span>
-              <strong>{formatINR(totalCost)}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontSize: '0.9rem', color: '#059669' }}>
-              <span>Total Payments Settled:</span>
-              <strong>{formatINR(totalPaid)}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px solid #111827', fontSize: '1.1rem', fontWeight: 800, color: '#111827' }}>
-              <span>Net Payable Balance:</span>
-              <span>{formatINR(netBalance)}</span>
-            </div>
-          </div>
+                  return items.map((line, idx) => {
+                    const b = boxDetails.find(box => box.id === line.boxId) || {};
+                    const margin = parseFloat(b.margin) || 0;
+                    const qty = parseInt(line.quantity) || 0;
+                    const totalLineMargin = margin * qty;
+                    const specStr = (b.length && b.width && b.height) ? `${b.length}×${b.width}×${b.height} ${b.unit || ''}` : '-';
+
+                    return (
+                      <tr key={`${o.id}_${idx}`}>
+                        <td className="small">{o.orderDate || '-'}</td>
+                        <td><strong>{o.customerName || '-'}</strong></td>
+                        <td><span className="badge bg-secondary-subtle text-secondary border">{o.factoryName || '-'}</span></td>
+                        <td>{line.boxName || b.boxName || '-'}</td>
+                        <td className="small text-muted">{specStr}</td>
+                        <td className="tabular-nums">{qty.toLocaleString('en-IN')}</td>
+                        <td className="tabular-nums">₹{margin.toFixed(2)}</td>
+                        <td className="tabular-nums fw-bold text-primary">{formatINR(totalLineMargin)}</td>
+                      </tr>
+                    );
+                  });
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Settled Payments Table */}
+      <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
+        <div className="p-3 bg-body-tertiary border-bottom d-flex justify-content-between align-items-center">
+          <div className="fw-bold font-outfit fs-6">Payments Received from Factory</div>
+          <span className="badge bg-success">{factoryPayments.length} Payments</span>
+        </div>
+        <div className="table-responsive">
+          <table className="table table-hover align-middle mb-0">
+            <thead className="table-dark">
+              <tr>
+                <th>Payment Date</th>
+                <th>Factory Name</th>
+                <th>Amount Paid (₹)</th>
+                <th>Payment Mode</th>
+                <th>Notes / Reference</th>
+              </tr>
+            </thead>
+            <tbody>
+              {factoryPayments.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="text-center py-4 text-muted">No payment transactions matching current filter criteria.</td>
+                </tr>
+              ) : (
+                factoryPayments.map(p => (
+                  <tr key={p.id}>
+                    <td className="small">{p.paymentDate || '-'}</td>
+                    <td><strong>{p.factoryName || '-'}</strong></td>
+                    <td className="tabular-nums text-success fw-bold">{formatINR(p.amountPaid)}</td>
+                    <td><span className="badge bg-success-subtle text-success border">{p.paymentMode || 'Cash'}</span></td>
+                    <td className="small text-muted">{p.notes || '-'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </section>

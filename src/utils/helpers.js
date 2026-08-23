@@ -1,11 +1,14 @@
-export const generateBoxDescription = ({ productName, length, width, height, unit, ply, gsmBf, type, boxType }) => {
+export const generateBoxDescription = ({ boxName, length, width, height, unit, category, ply, paperGsm, paperBf, openType }) => {
   const parts = [];
-  if (productName && productName.trim()) parts.push(productName.trim());
+  if (boxName && boxName.trim()) parts.push(boxName.trim());
   if (length && width && height) parts.push(`${length} × ${width} × ${height} ${unit || 'mm'}`);
-  if (ply) parts.push(ply);
-  if (gsmBf && gsmBf.trim()) parts.push(gsmBf.trim());
-  const bType = type || boxType;
-  if (bType && bType.trim()) parts.push(bType.trim());
+  if (category) parts.push(category);
+  if (ply) parts.push(`${ply}-Ply`);
+  if (paperGsm || paperBf) {
+    const specStr = [paperGsm ? paperGsm.trim() : '', paperBf ? paperBf.trim() : ''].filter(Boolean).join(' ');
+    if (specStr) parts.push(specStr);
+  }
+  if (openType) parts.push(openType);
   return parts.join(' — ');
 };
 

@@ -6,13 +6,14 @@ import { Orders } from './components/Orders';
 import { Products } from './components/Products';
 import { Factories } from './components/Factories';
 import { Customers } from './components/Customers';
+import { Payments } from './components/Payments';
 import { Reports } from './components/Reports';
 
+import { FactoryModal } from './components/modals/FactoryModal';
+import { CustomerModal } from './components/modals/CustomerModal';
+import { BoxModal } from './components/modals/BoxModal';
 import { OrderModal } from './components/modals/OrderModal';
-import { ProductModal } from './components/modals/ProductModal';
-import { EntityModal } from './components/modals/EntityModal';
-import { PayoutModal } from './components/modals/PayoutModal';
-import { CollectionModal } from './components/modals/CollectionModal';
+import { PaymentModal } from './components/modals/PaymentModal';
 import { LightboxModal } from './components/modals/LightboxModal';
 import { FirebaseModal } from './components/modals/FirebaseModal';
 
@@ -38,6 +39,7 @@ export const App = () => {
             <button type="button" className="btn-close" onClick={() => setSyncNotice(null)} aria-label="Close"></button>
           </div>
         )}
+
         {!user ? (
           <div className="auth-hero-section py-4">
             <div className="auth-ambient-glow"></div>
@@ -47,41 +49,41 @@ export const App = () => {
               <div className="auth-feature-list">
                 <div className="auth-feature-pill">
                   <div className="auth-pill-icon" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}>
-                    <i className="bi bi-box-seam-fill text-white fs-5"></i>
+                    <i className="bi bi-building-gear text-white fs-5"></i>
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Box Specs Catalog</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Length × Width × Height, Ply & GSM</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Factories Management</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Factory contacts, plant locations & pending balance dues</div>
                   </div>
                 </div>
 
                 <div className="auth-feature-pill">
                   <div className="auth-pill-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-                    <i className="bi bi-currency-rupee text-white fs-4"></i>
+                    <i className="bi bi-people-fill text-white fs-5"></i>
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Profit Margin Ledger</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Real-time net margin & payout receivables</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Customers Directory</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Client accounts & delivery address details</div>
                   </div>
                 </div>
 
                 <div className="auth-feature-pill">
                   <div className="auth-pill-icon" style={{ background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }}>
-                    <i className="bi bi-building-gear text-white fs-5"></i>
+                    <i className="bi bi-box-seam-fill text-white fs-5"></i>
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Factory Balance Sheets</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Running liabilities & payout logs</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Box Specifications Catalog</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>L×W×H, Ply, GSM, BF, Inner/Outer, Rate & Margin</div>
                   </div>
                 </div>
 
                 <div className="auth-feature-pill">
                   <div className="auth-pill-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
-                    <i className="bi bi-file-earmark-pdf-fill text-white fs-5"></i>
+                    <i className="bi bi-bag-check-fill text-white fs-5"></i>
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>PDF & Excel Reports</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>1-click downloadable factory statement PDFs & CSVs</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Rate-Free Orders & Work Orders</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Book production orders & export factory PDFs (No rates)</div>
                   </div>
                 </div>
               </div>
@@ -107,7 +109,7 @@ export const App = () => {
                 </h1>
 
                 <p className="text-muted mb-4 fw-medium" style={{ fontSize: '0.95rem' }}>
-                  Log in to your Brokerage Dashboard
+                  Log in to your 5-Table Factory & Order Manager
                 </p>
 
                 <div style={{ width: '100%', maxWidth: '380px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -144,24 +146,25 @@ export const App = () => {
         ) : (
           <>
             {activeTab === 'dashboard' && <Dashboard />}
-            {activeTab === 'orders' && <Orders />}
-            {activeTab === 'products' && <Products />}
             {activeTab === 'factories' && <Factories />}
             {activeTab === 'customers' && <Customers />}
+            {(activeTab === 'products' || activeTab === 'box-details') && <Products />}
+            {activeTab === 'orders' && <Orders />}
+            {activeTab === 'payments' && <Payments />}
             {activeTab === 'reports' && <Reports />}
           </>
         )}
       </main>
 
       <footer>
-        Factory Flow &copy; 2026 • Serverless Carton Box Brokerage & Financial Ledger
+        Factory Flow &copy; 2026 • 5-Table Carton Box Brokerage & Financial Ledger
       </footer>
 
+      {activeModal === 'factory' && <FactoryModal />}
+      {activeModal === 'customer' && <CustomerModal />}
+      {(activeModal === 'box' || activeModal === 'product') && <BoxModal />}
       {activeModal === 'order' && <OrderModal />}
-      {activeModal === 'product' && <ProductModal />}
-      {activeModal === 'entity' && <EntityModal />}
-      {activeModal === 'payout' && <PayoutModal />}
-      {activeModal === 'collection' && <CollectionModal />}
+      {activeModal === 'payment' && <PaymentModal />}
       {activeModal === 'firebase' && <FirebaseModal />}
       <LightboxModal />
     </>

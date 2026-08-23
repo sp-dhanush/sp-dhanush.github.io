@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
@@ -6,8 +6,147 @@ import { getSavedFirebaseConfig } from '../firebase-config';
 
 const AppContext = createContext();
 
+const initialDemoData = {
+  factories: [
+    {
+      id: 'f_1',
+      factoryName: 'Apex Packaging Pvt Ltd',
+      contactPersonName: 'Rajesh Sharma',
+      contactPersonNumber: '+91 98765 43210',
+      factoryAddress: 'Plot 42, GIDC Industrial Estate, Vadodara, Gujarat'
+    },
+    {
+      id: 'f_2',
+      factoryName: 'Surat Corrugation Works',
+      contactPersonName: 'Ketan Patel',
+      contactPersonNumber: '+91 98250 11223',
+      factoryAddress: 'Station Road, Sachin Industrial Area, Surat'
+    }
+  ],
+  customers: [
+    {
+      id: 'c_1',
+      customerName: 'Sun Pharma Industries',
+      customerAddress: '12 Corporate Park, Andheri East, Mumbai',
+      contactPersonName: 'Amit Verma',
+      contactPersonNumber: '+91 98123 45678'
+    },
+    {
+      id: 'c_2',
+      customerName: 'Gujarat Agro Foods Ltd',
+      customerAddress: 'Highway Hub, Sanand, Ahmedabad',
+      contactPersonName: 'Suresh Patel',
+      contactPersonNumber: '+91 97234 56789'
+    }
+  ],
+  boxDetails: [
+    {
+      id: 'b_1',
+      boxName: '1kg Medicine Master Carton',
+      length: 350,
+      width: 250,
+      height: 200,
+      unit: 'mm',
+      category: 'Outer',
+      ply: '5',
+      paperGsm: '180 GSM',
+      paperBf: '24 BF',
+      openType: 'Regular',
+      rate: 45.00,
+      margin: 5.00,
+      note: 'Heavy duty outer carton with waterproof lining',
+      photos: []
+    },
+    {
+      id: 'b_2',
+      boxName: '500g Inner Bottle Box',
+      length: 120,
+      width: 120,
+      height: 180,
+      unit: 'mm',
+      category: 'Inner',
+      ply: '3',
+      paperGsm: '140 GSM',
+      paperBf: '18 BF',
+      openType: 'Over Flop',
+      rate: 18.50,
+      margin: 2.50,
+      note: 'High stiffness inner folding carton',
+      photos: []
+    }
+  ],
+  orders: [
+    {
+      id: 'o_1',
+      customerId: 'c_1',
+      customerName: 'Sun Pharma Industries',
+      factoryId: 'f_1',
+      factoryName: 'Apex Packaging Pvt Ltd',
+      boxId: 'b_1',
+      boxName: '1kg Medicine Master Carton',
+      quantity: 5000,
+      orderDate: '2026-08-20',
+      deliveryDate: '2026-08-28',
+      notes: 'Dispatch via express cargo'
+    },
+    {
+      id: 'o_2',
+      customerId: 'c_2',
+      customerName: 'Gujarat Agro Foods Ltd',
+      factoryId: 'f_2',
+      factoryName: 'Surat Corrugation Works',
+      boxId: 'b_2',
+      boxName: '500g Inner Bottle Box',
+      quantity: 10000,
+      orderDate: '2026-08-22',
+      deliveryDate: '2026-08-30',
+      notes: 'Deliver directly to Sanand plant'
+    }
+  ],
+  paymentDetails: [
+    {
+      id: 'pay_1',
+      factoryId: 'f_1',
+      factoryName: 'Apex Packaging Pvt Ltd',
+      paymentDate: '2026-08-22',
+      amountPaid: 100000.00,
+      paymentMode: 'Bank Transfer',
+      notes: 'Advance RTGS for batch order #1'
+    }
+  ]
+};
+
 export const AppProvider = ({ children }) => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const getTabFromUrl = () => {
+    const path = window.location.pathname.replace(/^\//, '').toLowerCase();
+    if (!path) return 'dashboard';
+    if (path === 'products') return 'box-details';
+    const validTabs = ['dashboard', 'factories', 'customers', 'box-details', 'orders', 'payments', 'reports'];
+    return validTabs.includes(path) ? path : 'dashboard';
+  };
+
+  const [activeTab, setActiveTabState] = useState(getTabFromUrl);
+
+  const setActiveTab = (tab, skipPush = false) => {
+    const resolvedTab = tab === 'products' ? 'box-details' : tab;
+    setActiveTabState(resolvedTab);
+    if (!skipPush) {
+      const targetPath = '/' + resolvedTab;
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ tab: resolvedTab }, '', targetPath);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const tabFromUrl = getTabFromUrl();
+      setActiveTabState(tabFromUrl);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const getThemeCookie = () => {
     const match = document.cookie.match(/(?:^|; )factory_flow_theme=([^;]*)/);
     return match ? match[1] : (localStorage.getItem('factory_flow_theme') || 'dark');
@@ -33,15 +172,15 @@ export const AppProvider = ({ children }) => {
 
   const [factories, setFactories] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [boxDetails, setBoxDetails] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [transactions, setTransactions] = useState([]);
+  const [paymentDetails, setPaymentDetails] = useState([]);
 
   const [activeModal, setActiveModal] = useState(null);
   const [modalPayload, setModalPayload] = useState(null);
   const [lightboxImg, setLightboxImg] = useState(null);
 
-  const unsubscribersRef = React.useRef([]);
+  const unsubscribersRef = useRef([]);
 
   const detachListeners = () => {
     unsubscribersRef.current.forEach(unsub => typeof unsub === 'function' && unsub());
@@ -75,9 +214,9 @@ export const AppProvider = ({ children }) => {
           } else {
             setFactories([]);
             setCustomers([]);
-            setProducts([]);
+            setBoxDetails([]);
             setOrders([]);
-            setTransactions([]);
+            setPaymentDetails([]);
           }
         });
 
@@ -93,34 +232,30 @@ export const AppProvider = ({ children }) => {
     detachListeners();
     setIsDemoMode(true);
     setIsConnected(false);
-    const local = localStorage.getItem('factory_flow_demo_data');
+    const local = localStorage.getItem('factory_flow_v2_demo_data');
     if (local) {
       try {
         const parsed = JSON.parse(local);
-        if (parsed.orders && parsed.orders.some(o => o.orderNumber === 'ORD-2026-01' || o.id === 'o1')) {
-          localStorage.removeItem('factory_flow_demo_data');
-          setFactories([]);
-          setCustomers([]);
-          setProducts([]);
-          setOrders([]);
-          setTransactions([]);
-          return;
-        }
-        setFactories(parsed.factories || []);
-        setCustomers(parsed.customers || []);
-        setProducts(parsed.products || []);
-        setOrders(parsed.orders || []);
-        setTransactions(parsed.transactions || []);
+        setFactories(parsed.factories || initialDemoData.factories);
+        setCustomers(parsed.customers || initialDemoData.customers);
+        setBoxDetails(parsed.boxDetails || initialDemoData.boxDetails);
+        setOrders(parsed.orders || initialDemoData.orders);
+        setPaymentDetails(parsed.paymentDetails || initialDemoData.paymentDetails);
         return;
       } catch (e) {
-        console.warn('Local demo data error', e);
+        console.warn('Local demo data parse error', e);
       }
     }
-    setFactories([]);
-    setCustomers([]);
-    setProducts([]);
-    setOrders([]);
-    setTransactions([]);
+    setFactories(initialDemoData.factories);
+    setCustomers(initialDemoData.customers);
+    setBoxDetails(initialDemoData.boxDetails);
+    setOrders(initialDemoData.orders);
+    setPaymentDetails(initialDemoData.paymentDetails);
+  };
+
+  const saveLocalDemoState = (partial) => {
+    const current = { factories, customers, boxDetails, orders, paymentDetails, ...partial };
+    localStorage.setItem('factory_flow_v2_demo_data', JSON.stringify(current));
   };
 
   const [syncNotice, setSyncNotice] = useState(null);
@@ -143,19 +278,19 @@ export const AppProvider = ({ children }) => {
       setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, errHandler);
 
-    const unsubProd = onSnapshot(collection(firestoreDb, 'users', userId, 'products'), snap => {
-      setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsubBox = onSnapshot(collection(firestoreDb, 'users', userId, 'boxDetails'), snap => {
+      setBoxDetails(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, errHandler);
 
     const unsubOrd = onSnapshot(collection(firestoreDb, 'users', userId, 'orders'), snap => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, errHandler);
 
-    const unsubTx = onSnapshot(collection(firestoreDb, 'users', userId, 'transactions'), snap => {
-      setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const unsubPay = onSnapshot(collection(firestoreDb, 'users', userId, 'paymentDetails'), snap => {
+      setPaymentDetails(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, errHandler);
 
-    unsubscribersRef.current = [unsubFact, unsubCust, unsubProd, unsubOrd, unsubTx];
+    unsubscribersRef.current = [unsubFact, unsubCust, unsubBox, unsubOrd, unsubPay];
   };
 
   const loginWithGoogle = async () => {
@@ -176,9 +311,9 @@ export const AppProvider = ({ children }) => {
     setUser(null);
     setFactories([]);
     setCustomers([]);
-    setProducts([]);
+    setBoxDetails([]);
     setOrders([]);
-    setTransactions([]);
+    setPaymentDetails([]);
     if (auth) {
       await signOut(auth);
     }
@@ -195,24 +330,127 @@ export const AppProvider = ({ children }) => {
     return clean;
   };
 
-  const saveOrderDoc = async (ordData, id = null) => {
-    const targetId = id || ordData.id;
-    const cleanData = sanitizeForFirestore(ordData);
-    if (targetId) {
-      delete cleanData.id;
+  // 1. Factory Operations
+  const saveFactoryDoc = async (id, data) => {
+    const clean = sanitizeForFirestore(data);
+    if (id) {
       if (!isDemoMode && db && user) {
-        await updateDoc(doc(db, 'users', user.uid, 'orders', targetId), cleanData);
+        await updateDoc(doc(db, 'users', user.uid, 'factories', id), clean);
       } else {
-        const updated = orders.map(o => o.id === targetId ? { ...o, ...cleanData, id: targetId } : o);
+        const updated = factories.map(f => f.id === id ? { ...f, ...clean, id } : f);
+        setFactories(updated);
+        saveLocalDemoState({ factories: updated });
+      }
+    } else {
+      if (!isDemoMode && db && user) {
+        await addDoc(collection(db, 'users', user.uid, 'factories'), clean);
+      } else {
+        const updated = [{ ...clean, id: 'f_' + Date.now() }, ...factories];
+        setFactories(updated);
+        saveLocalDemoState({ factories: updated });
+      }
+    }
+  };
+
+  const deleteFactoryDoc = async (id) => {
+    const f = factories.find(i => i.id === id);
+    if (confirm(`Delete factory "${f ? f.factoryName : ''}"?`)) {
+      if (!isDemoMode && db && user) {
+        await deleteDoc(doc(db, 'users', user.uid, 'factories', id));
+      } else {
+        const updated = factories.filter(i => i.id !== id);
+        setFactories(updated);
+        saveLocalDemoState({ factories: updated });
+      }
+    }
+  };
+
+  // 2. Customer Operations
+  const saveCustomerDoc = async (id, data) => {
+    const clean = sanitizeForFirestore(data);
+    if (id) {
+      if (!isDemoMode && db && user) {
+        await updateDoc(doc(db, 'users', user.uid, 'customers', id), clean);
+      } else {
+        const updated = customers.map(c => c.id === id ? { ...c, ...clean, id } : c);
+        setCustomers(updated);
+        saveLocalDemoState({ customers: updated });
+      }
+    } else {
+      if (!isDemoMode && db && user) {
+        await addDoc(collection(db, 'users', user.uid, 'customers'), clean);
+      } else {
+        const updated = [{ ...clean, id: 'c_' + Date.now() }, ...customers];
+        setCustomers(updated);
+        saveLocalDemoState({ customers: updated });
+      }
+    }
+  };
+
+  const deleteCustomerDoc = async (id) => {
+    const c = customers.find(i => i.id === id);
+    if (confirm(`Delete customer "${c ? c.customerName : ''}"?`)) {
+      if (!isDemoMode && db && user) {
+        await deleteDoc(doc(db, 'users', user.uid, 'customers', id));
+      } else {
+        const updated = customers.filter(i => i.id !== id);
+        setCustomers(updated);
+        saveLocalDemoState({ customers: updated });
+      }
+    }
+  };
+
+  // 3. Box Details Operations
+  const saveBoxDoc = async (id, data) => {
+    const clean = sanitizeForFirestore(data);
+    if (id) {
+      if (!isDemoMode && db && user) {
+        await updateDoc(doc(db, 'users', user.uid, 'boxDetails', id), clean);
+      } else {
+        const updated = boxDetails.map(b => b.id === id ? { ...b, ...clean, id } : b);
+        setBoxDetails(updated);
+        saveLocalDemoState({ boxDetails: updated });
+      }
+    } else {
+      if (!isDemoMode && db && user) {
+        await addDoc(collection(db, 'users', user.uid, 'boxDetails'), clean);
+      } else {
+        const updated = [{ ...clean, id: 'b_' + Date.now() }, ...boxDetails];
+        setBoxDetails(updated);
+        saveLocalDemoState({ boxDetails: updated });
+      }
+    }
+  };
+
+  const deleteBoxDoc = async (id) => {
+    const b = boxDetails.find(i => i.id === id);
+    if (confirm(`Delete box specification "${b ? b.boxName : ''}"?`)) {
+      if (!isDemoMode && db && user) {
+        await deleteDoc(doc(db, 'users', user.uid, 'boxDetails', id));
+      } else {
+        const updated = boxDetails.filter(i => i.id !== id);
+        setBoxDetails(updated);
+        saveLocalDemoState({ boxDetails: updated });
+      }
+    }
+  };
+
+  // 4. Order Operations (NO MONEY FIELDS)
+  const saveOrderDoc = async (id, data) => {
+    const clean = sanitizeForFirestore(data);
+    if (id) {
+      if (!isDemoMode && db && user) {
+        await updateDoc(doc(db, 'users', user.uid, 'orders', id), clean);
+      } else {
+        const updated = orders.map(o => o.id === id ? { ...o, ...clean, id } : o);
         setOrders(updated);
         saveLocalDemoState({ orders: updated });
       }
     } else {
       if (!isDemoMode && db && user) {
-        await addDoc(collection(db, 'users', user.uid, 'orders'), cleanData);
+        await addDoc(collection(db, 'users', user.uid, 'orders'), clean);
       } else {
-        const newOrd = { ...cleanData, id: 'o_' + Date.now() };
-        const updated = [newOrd, ...orders];
+        const updated = [{ ...clean, id: 'o_' + Date.now() }, ...orders];
         setOrders(updated);
         saveLocalDemoState({ orders: updated });
       }
@@ -220,119 +458,50 @@ export const AppProvider = ({ children }) => {
   };
 
   const deleteOrderDoc = async (id) => {
-    if (confirm('Delete this order?')) {
+    const o = orders.find(i => i.id === id);
+    if (confirm(`Delete order for "${o ? o.boxName : ''}"?`)) {
       if (!isDemoMode && db && user) {
         await deleteDoc(doc(db, 'users', user.uid, 'orders', id));
       } else {
-        const updated = orders.filter(o => o.id !== id);
+        const updated = orders.filter(i => i.id !== id);
         setOrders(updated);
         saveLocalDemoState({ orders: updated });
       }
     }
   };
 
-  const saveProductDoc = async (id, item) => {
-    const cleanItem = sanitizeForFirestore(item);
+  // 5. Payment Operations
+  const savePaymentDoc = async (id, data) => {
+    const clean = sanitizeForFirestore(data);
     if (id) {
       if (!isDemoMode && db && user) {
-        await updateDoc(doc(db, 'users', user.uid, 'products', id), cleanItem);
+        await updateDoc(doc(db, 'users', user.uid, 'paymentDetails', id), clean);
       } else {
-        const updated = products.map(p => p.id === id ? { ...p, ...cleanItem } : p);
-        setProducts(updated);
-        saveLocalDemoState({ products: updated });
+        const updated = paymentDetails.map(p => p.id === id ? { ...p, ...clean, id } : p);
+        setPaymentDetails(updated);
+        saveLocalDemoState({ paymentDetails: updated });
       }
     } else {
       if (!isDemoMode && db && user) {
-        await addDoc(collection(db, 'users', user.uid, 'products'), cleanItem);
+        await addDoc(collection(db, 'users', user.uid, 'paymentDetails'), clean);
       } else {
-        const updated = [{ ...cleanItem, id: 'p_' + Date.now() }, ...products];
-        setProducts(updated);
-        saveLocalDemoState({ products: updated });
+        const updated = [{ ...clean, id: 'pay_' + Date.now() }, ...paymentDetails];
+        setPaymentDetails(updated);
+        saveLocalDemoState({ paymentDetails: updated });
       }
     }
   };
 
-  const deleteProductDoc = async (id) => {
-    const p = products.find(i => i.id === id);
-    if (confirm(`Delete product spec "${p ? p.productName : ''}"?`)) {
+  const deletePaymentDoc = async (id) => {
+    if (confirm(`Delete payment transaction?`)) {
       if (!isDemoMode && db && user) {
-        await deleteDoc(doc(db, 'users', user.uid, 'products', id));
+        await deleteDoc(doc(db, 'users', user.uid, 'paymentDetails', id));
       } else {
-        const updated = products.filter(i => i.id !== id);
-        setProducts(updated);
-        saveLocalDemoState({ products: updated });
+        const updated = paymentDetails.filter(i => i.id !== id);
+        setPaymentDetails(updated);
+        saveLocalDemoState({ paymentDetails: updated });
       }
     }
-  };
-
-  const saveEntityDoc = async (id, type, item) => {
-    const cleanItem = sanitizeForFirestore(item);
-    const coll = type === 'factory' ? 'factories' : 'customers';
-    if (id) {
-      if (!isDemoMode && db && user) {
-        await updateDoc(doc(db, 'users', user.uid, coll, id), cleanItem);
-      } else {
-        if (type === 'factory') {
-          const updated = factories.map(f => f.id === id ? { ...f, ...cleanItem } : f);
-          setFactories(updated);
-          saveLocalDemoState({ factories: updated });
-        } else {
-          const updated = customers.map(c => c.id === id ? { ...c, ...cleanItem } : c);
-          setCustomers(updated);
-          saveLocalDemoState({ customers: updated });
-        }
-      }
-    } else {
-      if (!isDemoMode && db && user) {
-        await addDoc(collection(db, 'users', user.uid, coll), cleanItem);
-      } else {
-        if (type === 'factory') {
-          const updated = [{ ...cleanItem, id: 'f_' + Date.now() }, ...factories];
-          setFactories(updated);
-          saveLocalDemoState({ factories: updated });
-        } else {
-          const updated = [{ ...cleanItem, id: 'c_' + Date.now() }, ...customers];
-          setCustomers(updated);
-          saveLocalDemoState({ customers: updated });
-        }
-      }
-    }
-  };
-
-  const deleteEntityDoc = async (id, type) => {
-    const list = type === 'factory' ? factories : customers;
-    const item = list.find(i => i.id === id);
-    if (confirm(`Delete ${type} "${item ? item.name : ''}"?`)) {
-      if (!isDemoMode && db && user) {
-        await deleteDoc(doc(db, 'users', user.uid, type === 'factory' ? 'factories' : 'customers', id));
-      } else {
-        if (type === 'factory') {
-          const updated = factories.filter(f => f.id !== id);
-          setFactories(updated);
-          saveLocalDemoState({ factories: updated });
-        } else {
-          const updated = customers.filter(c => c.id !== id);
-          setCustomers(updated);
-          saveLocalDemoState({ customers: updated });
-        }
-      }
-    }
-  };
-
-  const saveTransactionDoc = async (item) => {
-    const cleanItem = sanitizeForFirestore(item);
-    if (!isDemoMode && db && user) {
-      await addDoc(collection(db, 'users', user.uid, 'transactions'), cleanItem);
-    } else {
-      const updated = [{ ...cleanItem, id: 't_' + Date.now() }, ...transactions];
-      setTransactions(updated);
-      saveLocalDemoState({ transactions: updated });
-    }
-  };
-
-  const saveLocalDemoState = (partial) => {
-    const current = { factories, customers, products, orders, transactions, ...partial };
-    localStorage.setItem('factory_flow_demo_data', JSON.stringify(current));
   };
 
   return (
@@ -342,14 +511,15 @@ export const AppProvider = ({ children }) => {
       isDemoMode, setIsDemoMode,
       isConnected, syncNotice, setSyncNotice,
       user, loginWithGoogle, logout,
-      factories, customers, products, orders, transactions,
+      factories, customers, boxDetails, products: boxDetails, orders, paymentDetails,
       activeModal, setActiveModal,
       modalPayload, setModalPayload,
       lightboxImg, setLightboxImg,
+      saveFactoryDoc, deleteFactoryDoc,
+      saveCustomerDoc, deleteCustomerDoc,
+      saveBoxDoc, deleteBoxDoc, saveProductDoc: saveBoxDoc, deleteProductDoc: deleteBoxDoc,
       saveOrderDoc, deleteOrderDoc,
-      saveProductDoc, deleteProductDoc,
-      saveEntityDoc, deleteEntityDoc,
-      saveTransactionDoc,
+      savePaymentDoc, deletePaymentDoc,
       reloadFirebase: () => initFirebase()
     }}>
       {children}

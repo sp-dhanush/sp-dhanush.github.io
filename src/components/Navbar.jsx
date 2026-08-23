@@ -13,39 +13,44 @@ export const Navbar = () => {
   return (
     <header className="navbar navbar-expand-lg border-bottom sticky-top shadow-sm" style={{ background: 'var(--nav-bg)', backdropFilter: 'blur(12px)', zIndex: 1050 }}>
       <div className="container-fluid px-3 px-md-4">
-        <div className="d-flex align-items-center gap-2 brand">
+        <a href="/dashboard" className="d-flex align-items-center gap-2 brand me-lg-4 me-xl-5 text-decoration-none" onClick={(e) => { e.preventDefault(); handleTabClick('dashboard'); }}>
           <div className="brand-icon">
             <i className="bi bi-box-seam-fill text-white fs-5"></i>
           </div>
           <span className="fw-bold fs-5 text-reset font-outfit">Factory Flow</span>
-        </div>
+        </a>
 
+        {/* Navigation Items (Only visible when user is logged in) */}
         {user && (
-          <nav className={`nav-links ${mobileMenuOpen ? 'open' : ''}`}>
-            <button className={`nav-btn btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => handleTabClick('dashboard')}>
+          <nav className={`nav-links ms-lg-2 ms-xl-3 ${mobileMenuOpen ? 'open' : ''}`}>
+            <a href="/dashboard" className={`nav-btn btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('dashboard'); }}>
               <i className="bi bi-grid-fill me-1"></i>
               Dashboard
-            </button>
-            <button className={`nav-btn btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => handleTabClick('orders')}>
-              <i className="bi bi-bag-check-fill me-1"></i>
-              Orders & Margins
-            </button>
-            <button className={`nav-btn btn ${activeTab === 'products' ? 'active' : ''}`} onClick={() => handleTabClick('products')}>
-              <i className="bi bi-box-seam-fill me-1"></i>
-              Box Specs Catalog
-            </button>
-            <button className={`nav-btn btn ${activeTab === 'factories' ? 'active' : ''}`} onClick={() => handleTabClick('factories')}>
+            </a>
+            <a href="/factories" className={`nav-btn btn ${activeTab === 'factories' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('factories'); }}>
               <i className="bi bi-building-gear me-1"></i>
-              Factories Ledger
-            </button>
-            <button className={`nav-btn btn ${activeTab === 'customers' ? 'active' : ''}`} onClick={() => handleTabClick('customers')}>
+              Factories
+            </a>
+            <a href="/customers" className={`nav-btn btn ${activeTab === 'customers' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('customers'); }}>
               <i className="bi bi-people-fill me-1"></i>
               Customers
-            </button>
-            <button className={`nav-btn btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => handleTabClick('reports')}>
-              <i className="bi bi-file-earmark-pdf-fill me-1"></i>
-              Monthly PDF
-            </button>
+            </a>
+            <a href="/box-details" className={`nav-btn btn ${activeTab === 'products' || activeTab === 'box-details' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('box-details'); }}>
+              <i className="bi bi-box-seam-fill me-1"></i>
+              Box Details
+            </a>
+            <a href="/orders" className={`nav-btn btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('orders'); }}>
+              <i className="bi bi-bag-check-fill me-1"></i>
+              Orders
+            </a>
+            <a href="/payments" className={`nav-btn btn ${activeTab === 'payments' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('payments'); }}>
+              <i className="bi bi-credit-card-2-front-fill me-1"></i>
+              Payments
+            </a>
+            <a href="/reports" className={`nav-btn btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('reports'); }}>
+              <i className="bi bi-bar-chart-line-fill me-1"></i>
+              Reports
+            </a>
 
             <div className="mobile-auth-section d-lg-none mt-3 pt-3 border-top">
               <button
@@ -78,6 +83,7 @@ export const Navbar = () => {
           <button className="btn btn-secondary theme-toggle-btn rounded-circle" onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}>
             {theme === 'dark' ? <i className="bi bi-sun-fill text-warning"></i> : <i className="bi bi-moon-stars-fill text-primary"></i>}
           </button>
+
           {user ? (
             <button className="btn btn-secondary btn-sm d-none d-md-inline-flex align-items-center gap-1" onClick={logout}>
               <i className="bi bi-box-arrow-right"></i>
@@ -90,9 +96,11 @@ export const Navbar = () => {
             </button>
           )}
 
-          <button className="btn btn-secondary d-lg-none" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-            {mobileMenuOpen ? <i className="bi bi-x-lg"></i> : <i className="bi bi-list fs-5"></i>}
-          </button>
+          {user && (
+            <button className="btn btn-secondary d-lg-none" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              {mobileMenuOpen ? <i className="bi bi-x-lg"></i> : <i className="bi bi-list fs-5"></i>}
+            </button>
+          )}
         </div>
       </div>
     </header>
