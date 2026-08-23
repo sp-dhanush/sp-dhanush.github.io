@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Factory Flow - Redirecting...</title>
+  <script>
+    (function() {
+      var pathName = window.location.pathname;
+      var searchName = window.location.search;
+      // Strip repo name if deployed on subpath or root
+      var path = pathName.replace(/^\//, '').toLowerCase();
+      if (path === 'payments' || path === 'orders' || path === 'factories' || path === 'customers' || path === 'box-details' || path === 'dashboard' || path === 'reports') {
+        window.location.replace(window.location.origin + '/#/' + path + searchName);
+      } else {
+        window.location.replace(window.location.origin + '/#/' + (path ? path : 'dashboard') + searchName);
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+    <h2>Redirecting to Factory Flow...</h2>
+  </div>
+</body>
+</html>
