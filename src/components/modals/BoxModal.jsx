@@ -4,12 +4,10 @@ import { generateBoxDescription } from '../../utils/helpers';
 import { Upload, X } from 'lucide-react';
 
 export const BoxModal = () => {
-  const { modalPayload, saveBoxDoc, setActiveModal, customers, factories } = useApp();
+  const { modalPayload, saveBoxDoc, setActiveModal } = useApp();
   const b = modalPayload || {};
 
   const [boxName, setBoxName] = useState(b.boxName || b.productName || '');
-  const [customerId, setCustomerId] = useState(b.customerId || '');
-  const [factoryId, setFactoryId] = useState(b.factoryId || '');
   const [len, setLen] = useState(b.length || '');
   const [wid, setWid] = useState(b.width || '');
   const [hei, setHei] = useState(b.height || '');
@@ -90,15 +88,8 @@ export const BoxModal = () => {
     e.preventDefault();
     if (!boxName.trim()) return;
 
-    const custObj = customers.find(c => c.id === customerId);
-    const factObj = factories.find(f => f.id === factoryId);
-
     await saveBoxDoc(b.id, {
       boxName: boxName.trim(),
-      customerId: customerId || '',
-      customerName: custObj ? custObj.customerName : '',
-      factoryId: factoryId || '',
-      factoryName: factObj ? factObj.factoryName : '',
       length: parseFloat(len) || 0,
       width: parseFloat(wid) || 0,
       height: parseFloat(hei) || 0,
@@ -131,23 +122,6 @@ export const BoxModal = () => {
               <div className="form-group full-width">
                 <label>Box Name</label>
                 <input type="text" value={boxName} onChange={e => setBoxName(e.target.value)} placeholder="e.g. 1kg Medicine Master Carton" required />
-              </div>
-            </div>
-
-            <div className="form-grid" style={{ marginTop: '0.75rem' }}>
-              <div className="form-group">
-                <label>Customer (Optional)</label>
-                <select value={customerId} onChange={e => setCustomerId(e.target.value)}>
-                  <option value="">-- General / Any Customer --</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.customerName}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Preferred Factory (Optional)</label>
-                <select value={factoryId} onChange={e => setFactoryId(e.target.value)}>
-                  <option value="">-- General / Any Factory --</option>
-                  {factories.map(f => <option key={f.id} value={f.id}>{f.factoryName}</option>)}
-                </select>
               </div>
             </div>
 
