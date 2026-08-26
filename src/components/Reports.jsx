@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { exportFactoryStatementPDF } from '../utils/pdfExporter';
+import { 
+  exportFactoryMarginStatementPDF, 
+  exportFactoryRateStatementPDF 
+} from '../utils/pdfExporter';
 import { formatINR } from '../utils/helpers';
 
 export const Reports = () => {
@@ -8,6 +11,7 @@ export const Reports = () => {
   const [selectedFactoryId, setSelectedFactoryId] = useState(factories[0]?.id || '');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [monthStr, setMonthStr] = useState('');
+  const [activeReportTab, setActiveReportTab] = useState('margin'); // 'margin' | 'rate' | 'combined'
 
   const selectedFactory = factories.find(f => f.id === selectedFactoryId);
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
@@ -16,20 +20,28 @@ export const Reports = () => {
     ? (parseFloat(selectedFactory.openingBalance) || parseFloat(selectedFactory.currentBalance) || 0)
     : 0;
 
-  const factoryOrders = orders.filter(o => {
-    const matchFact = !selectedFactoryId || o.factoryId === selectedFactoryId;
-    const matchCust = !selectedCustomerId || o.customerId === selectedCustomerId;
-    const matchMonth = !monthStr || (o.orderDate && o.orderDate.startsWith(monthStr));
-    return matchFact && matchCust && matchMonth;
-  });
+  // Filter & sort orders descending by order date
+  const factoryOrders = orders
+    .filter(o => {
+      const matchFact = !selectedFactoryId || o.factoryId === selectedFactoryId;
+      const matchCust = !selectedCustomerId || o.customerId === selectedCustomerId;
+      const matchMonth = !monthStr || (o.orderDate && o.orderDate.startsWith(monthStr));
+      return matchFact && matchCust && matchMonth;
+    })
+    .sort((a, b) => (b.orderDate || '').localeCompare(a.orderDate || ''));
 
-  const factoryPayments = paymentDetails.filter(p => {
-    const matchFact = !selectedFactoryId || p.factoryId === selectedFactoryId;
-    const matchMonth = !monthStr || (p.paymentDate && p.paymentDate.startsWith(monthStr));
-    return matchFact && matchMonth;
-  });
+  // Filter & sort payments descending by payment date
+  const factoryPayments = paymentDetails
+    .filter(p => {
+      const matchFact = !selectedFactoryId || p.factoryId === selectedFactoryId;
+      const matchMonth = !monthStr || (p.paymentDate && p.paymentDate.startsWith(monthStr));
+      return matchFact && matchMonth;
+    })
+    .sort((a, b) => (b.paymentDate || '').localeCompare(a.paymentDate || ''));
 
   let totalMarginEarned = 0;
+  let totalRateValue = 0;
+
   factoryOrders.forEach(o => {
     const items = Array.isArray(o.items) && o.items.length > 0
       ? o.items
@@ -38,8 +50,10 @@ export const Reports = () => {
     items.forEach(it => {
       const b = boxDetails.find(box => box.id === it.boxId) || {};
       const margin = parseFloat(b.margin) || 0;
+      const rate = parseFloat(b.rate) || 0;
       const qty = parseInt(it.quantity) || 0;
       totalMarginEarned += margin * qty;
+      totalRateValue += rate * qty;
     });
   });
 
@@ -48,8 +62,9 @@ export const Reports = () => {
 
   const netPendingCommission = openingBal + totalMarginEarned - totalPaymentsSettled;
 
-  const handleDownloadPDF = () => {
-    exportFactoryStatementPDF({
+  // 1. Download Personal Margin Statement PDF
+  const handleDownloadMarginPDF = () => {
+    exportFactoryMarginStatementPDF({
       factory: selectedFactory || { factoryName: 'All Factories Margin Statement' },
       monthStr,
       factoryOrders,
@@ -58,17 +73,34 @@ export const Reports = () => {
     });
   };
 
+  // 2. Download Factory Rate / Supply Statement PDF
+  const handleDownloadRatePDF = () => {
+    exportFactoryRateStatementPDF({
+      factory: selectedFactory || { factoryName: 'All Factories Supply Statement' },
+      monthStr,
+      factoryOrders,
+      boxDetails
+    });
+  };
+
   return (
     <section id="tab-reports" className="tab-content active">
-      <div className="d-flex justify-content-between align-items-center mb-3">
+      {/* Header Bar with Dedicated Export Buttons */}
+      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-3">
         <div>
-          <div className="fs-4 fw-bold font-outfit">Brokerage Margin Reports & Statements</div>
-          <div className="text-muted small">Live calculation of margin commissions owed by factories to you</div>
+          <div className="fs-4 fw-bold font-outfit">Financial Reports & Statements</div>
+          <div className="text-muted small">Live calculation of personal margin commissions and factory supply order rates</div>
         </div>
-        <button className="btn btn-success d-flex align-items-center gap-2 rounded-3 px-3 py-2 shadow-sm" onClick={handleDownloadPDF}>
-          <i className="bi bi-file-earmark-pdf-fill fs-5"></i>
-          <span>Download Margin Statement PDF</span>
-        </button>
+        <div className="d-flex flex-wrap gap-2">
+          <button className="btn btn-success d-flex align-items-center gap-2 rounded-3 px-3 py-2 shadow-sm" onClick={handleDownloadMarginPDF} title="Download Personal Brokerage Margin Statement PDF">
+            <i className="bi bi-file-earmark-lock-fill fs-5"></i>
+            <span>Download Personal Margin PDF</span>
+          </button>
+          <button className="btn btn-primary d-flex align-items-center gap-2 rounded-3 px-3 py-2 shadow-sm" onClick={handleDownloadRatePDF} title="Download Factory Supply & Rate Statement PDF">
+            <i className="bi bi-file-earmark-text-fill fs-5"></i>
+            <span>Download Factory Rate PDF</span>
+          </button>
+        </div>
       </div>
 
       {/* 3-Column Filter Panel */}
@@ -120,11 +152,18 @@ export const Reports = () => {
         </div>
       )}
 
-      {/* Primary KPI Cards (Focused on Margin Commission) */}
-      <div className="row row-cols-1 row-cols-md-3 g-3 mb-4">
+      {/* Primary KPI Cards (Margin, Rate Value, Payments Received, Net Commission) */}
+      <div className="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-4">
+        <div className="col">
+          <div className="card border-0 shadow-sm p-3 bg-body-tertiary rounded-3 border-start border-4 border-info">
+            <div className="text-muted small mb-1 text-uppercase fw-bold">Total Factory Rate / Value</div>
+            <div className="fs-3 fw-bold tabular-nums font-outfit text-info">{formatINR(totalRateValue)}</div>
+            <div className="small text-muted mt-1">Based on Rate/Box across {factoryOrders.length} orders</div>
+          </div>
+        </div>
         <div className="col">
           <div className="card border-0 shadow-sm p-3 bg-body-tertiary rounded-3 border-start border-4 border-primary">
-            <div className="text-muted small mb-1 text-uppercase fw-bold">Total Margin Commission Earned</div>
+            <div className="text-muted small mb-1 text-uppercase fw-bold">Personal Margin Commission</div>
             <div className="fs-3 fw-bold tabular-nums font-outfit text-primary">{formatINR(totalMarginEarned)}</div>
             <div className="small text-muted mt-1">Calculated from {factoryOrders.length} matching orders</div>
           </div>
@@ -149,12 +188,40 @@ export const Reports = () => {
         </div>
       </div>
 
-      {/* Orders Margin Breakdown Table */}
+      {/* Orders Breakdown Table with Report View Switcher */}
       <div className="card border-0 shadow-sm rounded-3 overflow-hidden mb-4">
-        <div className="p-3 bg-body-tertiary border-bottom d-flex justify-content-between align-items-center">
-          <div className="fw-bold font-outfit fs-6">Orders Margin Commission Breakdown</div>
-          <span className="badge bg-secondary">{factoryOrders.length} Orders</span>
+        <div className="p-3 bg-body-tertiary border-bottom d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2">
+          <div className="d-flex align-items-center gap-2">
+            <div className="fw-bold font-outfit fs-6">Orders Financial Breakdown</div>
+            <span className="badge bg-secondary">{factoryOrders.length} Orders (Sorted: Newest First)</span>
+          </div>
+
+          {/* View Mode Buttons */}
+          <div className="btn-group btn-group-sm" role="group">
+            <button 
+              type="button" 
+              className={`btn ${activeReportTab === 'margin' ? 'btn-primary' : 'btn-outline-secondary'}`}
+              onClick={() => setActiveReportTab('margin')}
+            >
+              Personal Margin Report
+            </button>
+            <button 
+              type="button" 
+              className={`btn ${activeReportTab === 'rate' ? 'btn-primary' : 'btn-outline-secondary'}`}
+              onClick={() => setActiveReportTab('rate')}
+            >
+              Factory Rate / Value Report
+            </button>
+            <button 
+              type="button" 
+              className={`btn ${activeReportTab === 'combined' ? 'btn-primary' : 'btn-outline-secondary'}`}
+              onClick={() => setActiveReportTab('combined')}
+            >
+              All Columns Combined
+            </button>
+          </div>
         </div>
+
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0">
             <thead className="table-dark">
@@ -165,14 +232,26 @@ export const Reports = () => {
                 <th>Box Name</th>
                 <th>Specs</th>
                 <th>Quantity</th>
-                <th>My Margin / Box (₹)</th>
-                <th>Total Margin Earned (₹)</th>
+                {(activeReportTab === 'rate' || activeReportTab === 'combined') && (
+                  <>
+                    <th>Factory Rate / Box (₹)</th>
+                    <th>Total Order Value (₹)</th>
+                  </>
+                )}
+                {(activeReportTab === 'margin' || activeReportTab === 'combined') && (
+                  <>
+                    <th>My Margin / Box (₹)</th>
+                    <th>Total Margin Earned (₹)</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
               {factoryOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="text-center py-4 text-muted">No orders matching current filter criteria.</td>
+                  <td colSpan={activeReportTab === 'combined' ? 10 : 8} className="text-center py-4 text-muted">
+                    No orders matching current filter criteria.
+                  </td>
                 </tr>
               ) : (
                 factoryOrders.map(o => {
@@ -183,20 +262,34 @@ export const Reports = () => {
                   return items.map((line, idx) => {
                     const b = boxDetails.find(box => box.id === line.boxId) || {};
                     const margin = parseFloat(b.margin) || 0;
+                    const rate = parseFloat(b.rate) || 0;
                     const qty = parseInt(line.quantity) || 0;
                     const totalLineMargin = margin * qty;
+                    const totalLineRate = rate * qty;
                     const specStr = (b.length && b.width && b.height) ? `${b.length}×${b.width}×${b.height} ${b.unit || ''}` : '-';
 
                     return (
                       <tr key={`${o.id}_${idx}`}>
-                        <td className="small">{o.orderDate || '-'}</td>
+                        <td className="small fw-medium">{o.orderDate || '-'}</td>
                         <td><strong>{o.customerName || '-'}</strong></td>
                         <td><span className="badge bg-secondary-subtle text-secondary border">{o.factoryName || '-'}</span></td>
                         <td>{line.boxName || b.boxName || '-'}</td>
                         <td className="small text-muted">{specStr}</td>
                         <td className="tabular-nums">{qty.toLocaleString('en-IN')}</td>
-                        <td className="tabular-nums">₹{margin.toFixed(2)}</td>
-                        <td className="tabular-nums fw-bold text-primary">{formatINR(totalLineMargin)}</td>
+                        
+                        {(activeReportTab === 'rate' || activeReportTab === 'combined') && (
+                          <>
+                            <td className="tabular-nums">{rate ? `₹${rate.toFixed(2)}` : '-'}</td>
+                            <td className="tabular-nums fw-bold text-info">{formatINR(totalLineRate)}</td>
+                          </>
+                        )}
+
+                        {(activeReportTab === 'margin' || activeReportTab === 'combined') && (
+                          <>
+                            <td className="tabular-nums">{margin ? `₹${margin.toFixed(2)}` : '-'}</td>
+                            <td className="tabular-nums fw-bold text-primary">{formatINR(totalLineMargin)}</td>
+                          </>
+                        )}
                       </tr>
                     );
                   });
@@ -207,11 +300,11 @@ export const Reports = () => {
         </div>
       </div>
 
-      {/* Settled Payments Table */}
+      {/* Settled Payments Table (Sorted Descending by Payment Date) */}
       <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
         <div className="p-3 bg-body-tertiary border-bottom d-flex justify-content-between align-items-center">
           <div className="fw-bold font-outfit fs-6">Payments Received from Factory</div>
-          <span className="badge bg-success">{factoryPayments.length} Payments</span>
+          <span className="badge bg-success">{factoryPayments.length} Payments (Sorted: Newest First)</span>
         </div>
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0">
@@ -232,7 +325,7 @@ export const Reports = () => {
               ) : (
                 factoryPayments.map(p => (
                   <tr key={p.id}>
-                    <td className="small">{p.paymentDate || '-'}</td>
+                    <td className="small fw-medium">{p.paymentDate || '-'}</td>
                     <td><strong>{p.factoryName || '-'}</strong></td>
                     <td className="tabular-nums text-success fw-bold">{formatINR(p.amountPaid)}</td>
                     <td><span className="badge bg-success-subtle text-success border">{p.paymentMode || 'Cash'}</span></td>

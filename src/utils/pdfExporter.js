@@ -213,18 +213,19 @@ export const exportWorkOrderPDF = (order, boxDetailsList = []) => {
   doc.save(`WorkOrder_${cleanName}_${order.orderDate || 'draft'}.pdf`);
 };
 
-export const exportFactoryStatementPDF = ({ factory, monthStr, factoryOrders, factoryPayments, boxDetails }) => {
+// 1. Personal Margin Commission Statement PDF (Personal Report)
+export const exportFactoryMarginStatementPDF = ({ factory, monthStr, factoryOrders, factoryPayments, boxDetails }) => {
   const doc = new jsPDF();
-  const factoryName = factory ? factory.factoryName : 'Factory Commission Ledger';
+  const factoryName = factory ? factory.factoryName : 'Brokerage Margin Ledger';
   const factoryAddress = factory ? (factory.factoryAddress || '') : '';
   const contactPerson = factory ? (factory.contactPersonName + (factory.contactPersonNumber ? ' (' + factory.contactPersonNumber + ')' : '')) : '';
   const openingBal = factory ? (parseFloat(factory.openingBalance) || parseFloat(factory.currentBalance) || 0) : 0;
 
-  // Header Title (Properly sized to avoid clipping)
+  // Header Title
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
   doc.setTextColor(30, 41, 59);
-  doc.text('FACTORY MARGIN COMMISSION STATEMENT', 14, 16);
+  doc.text('PERSONAL BROKERAGE MARGIN STATEMENT', 14, 16);
 
   // Subtitle / Header details
   doc.setFontSize(10);
@@ -249,11 +250,14 @@ export const exportFactoryStatementPDF = ({ factory, monthStr, factoryOrders, fa
 
   let startTableY = Math.max(38, 28 + addrHeight + 8);
 
-  // Table 1: Orders Margin Commission
+  // Sort orders descending by orderDate
+  const sortedOrders = [...factoryOrders].sort((a, b) => (b.orderDate || '').localeCompare(a.orderDate || ''));
+
+  // Table 1: Orders Margin Commission Breakdown
   let totalMarginEarned = 0;
   const orderRows = [];
 
-  factoryOrders.forEach(o => {
+  sortedOrders.forEach(o => {
     const items = Array.isArray(o.items) && o.items.length > 0
       ? o.items
       : [{ boxId: o.boxId, boxName: o.boxName, quantity: o.quantity }];
@@ -281,7 +285,7 @@ export const exportFactoryStatementPDF = ({ factory, monthStr, factoryOrders, fa
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(30, 41, 59);
-  doc.text('Orders Margin Commission Earned', 14, startTableY);
+  doc.text('Orders Margin Commission Earned (Sorted: Newest First)', 14, startTableY);
 
   doc.autoTable({
     startY: startTableY + 3,
@@ -304,9 +308,12 @@ export const exportFactoryStatementPDF = ({ factory, monthStr, factoryOrders, fa
 
   let nextY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : startTableY + 40;
 
+  // Sort payments descending by paymentDate
+  const sortedPayments = [...factoryPayments].sort((a, b) => (b.paymentDate || '').localeCompare(a.paymentDate || ''));
+
   // Table 2: Settled Payments Received
   let totalPaid = 0;
-  const paymentRows = factoryPayments.map(p => {
+  const paymentRows = sortedPayments.map(p => {
     const amt = parseFloat(p.amountPaid) || 0;
     totalPaid += amt;
     return [
@@ -320,7 +327,7 @@ export const exportFactoryStatementPDF = ({ factory, monthStr, factoryOrders, fa
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(30, 41, 59);
-  doc.text('Settled Factory Payments Received', 14, nextY);
+  doc.text('Settled Factory Payments Received (Sorted: Newest First)', 14, nextY);
 
   doc.autoTable({
     startY: nextY + 3,
@@ -341,10 +348,7 @@ export const exportFactoryStatementPDF = ({ factory, monthStr, factoryOrders, fa
   let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : nextY + 30;
   const netPendingCommission = openingBal + totalMarginEarned - totalPaid;
 
-  // Render Summary Box at Bottom Right (x=90 to x=196) with right-aligned amounts
   const boxHeight = openingBal > 0 ? 36 : 28;
-  
-  // Check page overflow
   if (finalY + boxHeight > 280) {
     doc.addPage();
     finalY = 20;
@@ -376,17 +380,336 @@ export const exportFactoryStatementPDF = ({ factory, monthStr, factoryOrders, fa
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   if (netPendingCommission > 0) {
-    doc.setTextColor(220, 38, 38); // Red
+    doc.setTextColor(220, 38, 38);
     doc.text('Net Commission Pending:', 92, boxY);
     doc.text(`Rs. ${netPendingCommission.toLocaleString('en-IN')}`, 192, boxY, { align: 'right' });
   } else {
-    doc.setTextColor(5, 150, 105); // Green
+    doc.setTextColor(5, 150, 105);
     doc.text('Net Commission Balance:', 92, boxY);
     doc.text(`Rs. ${netPendingCommission.toLocaleString('en-IN')} (Settled)`, 192, boxY, { align: 'right' });
   }
 
   const cleanFactName = factoryName.replace(/[^a-zA-Z0-9_-]/g, '_');
-  doc.save(`${cleanFactName}_Margin_Statement_${monthStr || 'all'}.pdf`);
+  doc.save(`Personal_Margin_Statement_${cleanFactName}_${monthStr || 'all'}.pdf`);
+};
+
+// 2. Factory Rate & Supply Statement PDF (Factory Report)
+export const exportFactoryRateStatementPDF = ({ factory, monthStr, factoryOrders, boxDetails }) => {
+  const doc = new jsPDF();
+  const factoryName = factory ? factory.factoryName : 'Factory Production Ledger';
+  const factoryAddress = factory ? (factory.factoryAddress || '') : '';
+  const contactPerson = factory ? (factory.contactPersonName + (factory.contactPersonNumber ? ' (' + factory.contactPersonNumber + ')' : '')) : '';
+
+  // Header Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(30, 41, 59);
+  doc.text('FACTORY PRODUCTION RATE & SUPPLY STATEMENT', 14, 16);
+
+  // Subtitle / Header details
+  doc.setFontSize(10);
+  doc.text(factoryName, 14, 23);
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  
+  const splitAddress = doc.splitTextToSize(factoryAddress, 110);
+  doc.text(splitAddress, 14, 28);
+  let addrHeight = (splitAddress.length * 3.5);
+  if (contactPerson) {
+    doc.text(`Contact: ${contactPerson}`, 14, 28 + addrHeight);
+  }
+
+  // Right-aligned Metadata
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Statement Period: ${monthStr || 'All Time'}`, 196, 23, { align: 'right' });
+  doc.text(`Date Generated: ${new Date().toLocaleDateString('en-IN')}`, 196, 28, { align: 'right' });
+
+  let startTableY = Math.max(38, 28 + addrHeight + 8);
+
+  // Sort orders descending by orderDate
+  const sortedOrders = [...factoryOrders].sort((a, b) => (b.orderDate || '').localeCompare(a.orderDate || ''));
+
+  // Table: Orders Factory Rate Breakdown
+  let totalRateValue = 0;
+  let totalOrderQty = 0;
+  const orderRows = [];
+
+  sortedOrders.forEach(o => {
+    const items = Array.isArray(o.items) && o.items.length > 0
+      ? o.items
+      : [{ boxId: o.boxId, boxName: o.boxName, quantity: o.quantity }];
+
+    items.forEach(item => {
+      const b = (Array.isArray(boxDetails) ? boxDetails.find(box => box.id === item.boxId) : null) || {};
+      const ratePerBox = parseFloat(b.rate) || 0;
+      const qty = parseInt(item.quantity) || 0;
+      const itemRateTotal = ratePerBox * qty;
+      
+      totalRateValue += itemRateTotal;
+      totalOrderQty += qty;
+
+      const specStr = (b.length && b.width && b.height) ? `${b.length}×${b.width}×${b.height} ${b.unit || ''}, ${b.ply || ''}Ply` : (item.boxName || '-');
+      orderRows.push([
+        o.orderDate || '-',
+        o.customerName || '-',
+        item.boxName || b.boxName || '-',
+        specStr,
+        qty.toLocaleString('en-IN'),
+        `Rs. ${ratePerBox.toFixed(2)}`,
+        `Rs. ${itemRateTotal.toLocaleString('en-IN')}`
+      ]);
+    });
+  });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(30, 41, 59);
+  doc.text('Orders Factory Rate & Value (Sorted: Newest First)', 14, startTableY);
+
+  doc.autoTable({
+    startY: startTableY + 3,
+    margin: { left: 14, right: 14 },
+    head: [['Order Date', 'Customer', 'Box Name', 'Specs', 'Qty', 'Factory Rate/Box', 'Total Order Value']],
+    body: orderRows,
+    theme: 'grid',
+    headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+    bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { cellWidth: 22 },
+      1: { cellWidth: 32 },
+      2: { cellWidth: 35 },
+      3: { cellWidth: 35 },
+      4: { cellWidth: 16, halign: 'right' },
+      5: { cellWidth: 22, halign: 'right' },
+      6: { cellWidth: 26, halign: 'right' }
+    }
+  });
+
+  let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : startTableY + 40;
+
+  const boxHeight = 28;
+  if (finalY + boxHeight > 280) {
+    doc.addPage();
+    finalY = 20;
+  }
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(88, finalY, 108, boxHeight, 3, 3, 'FD');
+
+  let boxY = finalY + 8;
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+
+  doc.text('Total Ordered Boxes:', 92, boxY);
+  doc.text(`${totalOrderQty.toLocaleString('en-IN')} Boxes`, 192, boxY, { align: 'right' });
+  boxY += 6.5;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(30, 41, 59);
+  doc.text('Total Factory Order Value:', 92, boxY);
+  doc.text(`Rs. ${totalRateValue.toLocaleString('en-IN')}`, 192, boxY, { align: 'right' });
+
+  const cleanFactName = factoryName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  doc.save(`Factory_Rate_Statement_${cleanFactName}_${monthStr || 'all'}.pdf`);
+};
+
+// 3. Combined Margin & Rate Statement PDF
+export const exportFactoryStatementPDF = ({ factory, monthStr, factoryOrders, factoryPayments, boxDetails }) => {
+  const doc = new jsPDF();
+  const factoryName = factory ? factory.factoryName : 'Factory Financial Ledger';
+  const factoryAddress = factory ? (factory.factoryAddress || '') : '';
+  const contactPerson = factory ? (factory.contactPersonName + (factory.contactPersonNumber ? ' (' + factory.contactPersonNumber + ')' : '')) : '';
+  const openingBal = factory ? (parseFloat(factory.openingBalance) || parseFloat(factory.currentBalance) || 0) : 0;
+
+  // Header Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(30, 41, 59);
+  doc.text('FACTORY MARGIN & RATE FINANCIAL STATEMENT', 14, 16);
+
+  // Subtitle / Header details
+  doc.setFontSize(10);
+  doc.text(factoryName, 14, 23);
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  
+  const splitAddress = doc.splitTextToSize(factoryAddress, 110);
+  doc.text(splitAddress, 14, 28);
+  let addrHeight = (splitAddress.length * 3.5);
+  if (contactPerson) {
+    doc.text(`Contact: ${contactPerson}`, 14, 28 + addrHeight);
+  }
+
+  // Right-aligned Metadata
+  doc.setFontSize(8);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Statement Period: ${monthStr || 'All Time'}`, 196, 23, { align: 'right' });
+  doc.text(`Date Generated: ${new Date().toLocaleDateString('en-IN')}`, 196, 28, { align: 'right' });
+
+  let startTableY = Math.max(38, 28 + addrHeight + 8);
+
+  // Sort orders descending by orderDate
+  const sortedOrders = [...factoryOrders].sort((a, b) => (b.orderDate || '').localeCompare(a.orderDate || ''));
+
+  // Table 1: Orders Rate & Margin Commission Breakdown
+  let totalMarginEarned = 0;
+  let totalRateValue = 0;
+  const orderRows = [];
+
+  sortedOrders.forEach(o => {
+    const items = Array.isArray(o.items) && o.items.length > 0
+      ? o.items
+      : [{ boxId: o.boxId, boxName: o.boxName, quantity: o.quantity }];
+
+    items.forEach(item => {
+      const b = (Array.isArray(boxDetails) ? boxDetails.find(box => box.id === item.boxId) : null) || {};
+      const marginPerBox = parseFloat(b.margin) || 0;
+      const ratePerBox = parseFloat(b.rate) || 0;
+      const qty = parseInt(item.quantity) || 0;
+      const itemMarginTotal = marginPerBox * qty;
+      const itemRateTotal = ratePerBox * qty;
+      
+      totalMarginEarned += itemMarginTotal;
+      totalRateValue += itemRateTotal;
+
+      const specStr = (b.length && b.width && b.height) ? `${b.length}×${b.width}×${b.height} ${b.unit || ''}, ${b.ply || ''}Ply` : (item.boxName || '-');
+      orderRows.push([
+        o.orderDate || '-',
+        o.customerName || '-',
+        item.boxName || b.boxName || '-',
+        specStr,
+        qty.toLocaleString('en-IN'),
+        `Rs. ${ratePerBox.toFixed(2)}`,
+        `Rs. ${itemRateTotal.toLocaleString('en-IN')}`,
+        `Rs. ${marginPerBox.toFixed(2)}`,
+        `Rs. ${itemMarginTotal.toLocaleString('en-IN')}`
+      ]);
+    });
+  });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(30, 41, 59);
+  doc.text('Orders Financial Breakdown (Sorted: Newest First)', 14, startTableY);
+
+  doc.autoTable({
+    startY: startTableY + 3,
+    margin: { left: 14, right: 14 },
+    head: [['Order Date', 'Customer', 'Box Name', 'Specs', 'Qty', 'Rate/Box', 'Total Rate', 'Margin/Box', 'Total Margin']],
+    body: orderRows,
+    theme: 'grid',
+    headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontSize: 7.5, fontStyle: 'bold' },
+    bodyStyles: { fontSize: 7, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { cellWidth: 18 },
+      1: { cellWidth: 26 },
+      2: { cellWidth: 26 },
+      3: { cellWidth: 26 },
+      4: { cellWidth: 14, halign: 'right' },
+      5: { cellWidth: 17, halign: 'right' },
+      6: { cellWidth: 21, halign: 'right' },
+      7: { cellWidth: 16, halign: 'right' },
+      8: { cellWidth: 18, halign: 'right' }
+    }
+  });
+
+  let nextY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : startTableY + 40;
+
+  // Sort payments descending by paymentDate
+  const sortedPayments = [...factoryPayments].sort((a, b) => (b.paymentDate || '').localeCompare(a.paymentDate || ''));
+
+  // Table 2: Settled Payments Received
+  let totalPaid = 0;
+  const paymentRows = sortedPayments.map(p => {
+    const amt = parseFloat(p.amountPaid) || 0;
+    totalPaid += amt;
+    return [
+      p.paymentDate || '-',
+      `Rs. ${amt.toLocaleString('en-IN')}`,
+      p.paymentMode || 'Cash',
+      p.notes || '-'
+    ];
+  });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(30, 41, 59);
+  doc.text('Settled Factory Payments Received (Sorted: Newest First)', 14, nextY);
+
+  doc.autoTable({
+    startY: nextY + 3,
+    margin: { left: 14, right: 14 },
+    head: [['Payment Date', 'Amount Paid', 'Payment Mode', 'Notes & Reference']],
+    body: paymentRows,
+    theme: 'grid',
+    headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+    bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { cellWidth: 28 },
+      1: { cellWidth: 32, halign: 'right' },
+      2: { cellWidth: 32 },
+      3: { cellWidth: 'auto' }
+    }
+  });
+
+  let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : nextY + 30;
+  const netPendingCommission = openingBal + totalMarginEarned - totalPaid;
+
+  const boxHeight = openingBal > 0 ? 42 : 36;
+  if (finalY + boxHeight > 280) {
+    doc.addPage();
+    finalY = 20;
+  }
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(82, finalY, 114, boxHeight, 3, 3, 'FD');
+
+  let boxY = finalY + 6;
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+
+  doc.text('Total Rate / Supply Value:', 86, boxY);
+  doc.text(`Rs. ${totalRateValue.toLocaleString('en-IN')}`, 192, boxY, { align: 'right' });
+  boxY += 5.5;
+
+  if (openingBal > 0) {
+    doc.text('Initial Opening Margin:', 86, boxY);
+    doc.text(`Rs. ${openingBal.toLocaleString('en-IN')}`, 192, boxY, { align: 'right' });
+    boxY += 5.5;
+  }
+
+  doc.text('Total Margin Commission Earned:', 86, boxY);
+  doc.text(`Rs. ${totalMarginEarned.toLocaleString('en-IN')}`, 192, boxY, { align: 'right' });
+  boxY += 5.5;
+
+  doc.text('Factory Payments Received:', 86, boxY);
+  doc.text(`Rs. ${totalPaid.toLocaleString('en-IN')}`, 192, boxY, { align: 'right' });
+  boxY += 7.5;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  if (netPendingCommission > 0) {
+    doc.setTextColor(220, 38, 38);
+    doc.text('Net Commission Pending:', 86, boxY);
+    doc.text(`Rs. ${netPendingCommission.toLocaleString('en-IN')}`, 192, boxY, { align: 'right' });
+  } else {
+    doc.setTextColor(5, 150, 105);
+    doc.text('Net Commission Balance:', 86, boxY);
+    doc.text(`Rs. ${netPendingCommission.toLocaleString('en-IN')} (Settled)`, 192, boxY, { align: 'right' });
+  }
+
+  const cleanFactName = factoryName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  doc.save(`${cleanFactName}_Financial_Statement_${monthStr || 'all'}.pdf`);
 };
 
 export const exportBoxCatalogPDF = (boxes = [], { customerName, factoryName, categoryFilter, search } = {}) => {
@@ -424,7 +747,7 @@ export const exportBoxCatalogPDF = (boxes = [], { customerName, factoryName, cat
   const photosToRender = [];
 
   const tableBody = boxes.map((b, idx) => {
-    const dimStr = (b.length && b.width && b.height) ? `${b.length}×${b.width}×${b.height} ${b.unit || 'mm'}` : '-';
+    const dimStr = (b.length && b.width && b.height) ? `${b.length}×${b.width}×${b.height} ${b.unit || ''}` : '-';
     const gsmBfStr = [b.paperGsm, b.paperBf].filter(Boolean).join(' / ') || '-';
     const rateStr = b.rate ? `Rs. ${Number(b.rate).toFixed(2)}` : '-';
     const marginStr = b.margin ? `Rs. ${Number(b.margin).toFixed(2)}` : '-';
