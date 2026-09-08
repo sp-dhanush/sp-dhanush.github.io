@@ -31,11 +31,12 @@ export const Factories = () => {
             orders.filter(o => o.factoryId === f.id).forEach(o => {
               const items = Array.isArray(o.items) && o.items.length > 0
                 ? o.items
-                : [{ boxId: o.boxId, quantity: o.quantity }];
+                : [{ boxId: o.boxId, quantity: o.quantity, margin: o.margin }];
 
               items.forEach(it => {
                 const b = boxDetails.find(box => box.id === it.boxId) || {};
-                factoryMarginEarned += (parseFloat(b.margin) || 0) * (parseInt(it.quantity) || 0);
+                const margin = it.margin !== undefined ? parseFloat(it.margin) : (parseFloat(b.margin) || 0);
+                factoryMarginEarned += margin * (parseInt(it.quantity) || 0);
               });
             });
 

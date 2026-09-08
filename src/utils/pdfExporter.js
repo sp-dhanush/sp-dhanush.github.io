@@ -260,11 +260,11 @@ export const exportFactoryMarginStatementPDF = ({ factory, monthStr, factoryOrde
   sortedOrders.forEach(o => {
     const items = Array.isArray(o.items) && o.items.length > 0
       ? o.items
-      : [{ boxId: o.boxId, boxName: o.boxName, quantity: o.quantity }];
+      : [{ boxId: o.boxId, boxName: o.boxName, quantity: o.quantity, margin: o.margin }];
 
     items.forEach(item => {
       const b = (Array.isArray(boxDetails) ? boxDetails.find(box => box.id === item.boxId) : null) || {};
-      const marginPerBox = parseFloat(b.margin) || 0;
+      const marginPerBox = item.margin !== undefined ? parseFloat(item.margin) : (parseFloat(b.margin) || 0);
       const qty = parseInt(item.quantity) || 0;
       const itemMarginTotal = marginPerBox * qty;
       totalMarginEarned += itemMarginTotal;
@@ -440,11 +440,11 @@ export const exportFactoryRateStatementPDF = ({ factory, monthStr, factoryOrders
   sortedOrders.forEach(o => {
     const items = Array.isArray(o.items) && o.items.length > 0
       ? o.items
-      : [{ boxId: o.boxId, boxName: o.boxName, quantity: o.quantity }];
+      : [{ boxId: o.boxId, boxName: o.boxName, quantity: o.quantity, rate: o.rate }];
 
     items.forEach(item => {
       const b = (Array.isArray(boxDetails) ? boxDetails.find(box => box.id === item.boxId) : null) || {};
-      const ratePerBox = parseFloat(b.rate) || 0;
+      const ratePerBox = item.rate !== undefined ? parseFloat(item.rate) : (parseFloat(b.rate) || 0);
       const qty = parseInt(item.quantity) || 0;
       const itemRateTotal = ratePerBox * qty;
       
@@ -874,4 +874,183 @@ export const exportBoxCatalogPDF = (boxes = [], { customerName, factoryName, cat
 
   const dateStr = new Date().toISOString().split('T')[0];
   doc.save(`Box_Details_Catalog_${dateStr}.pdf`);
+};
+
+// 4. Personal Margin Statement PDF_new (Enhanced Credit & Debit Running Ledger)
+export const exportPersonalMarginPDFNew = ({ factory, monthStr, factoryOrders = [], factoryPayments = [], boxDetails = [] }) => {
+  const doc = new jsPDF();
+  const factoryName = factory ? factory.factoryName : 'All Factories Brokerage Ledger';
+  const factoryAddress = factory ? (factory.factoryAddress || '') : '';
+  const contactPerson = factory ? (factory.contactPersonName + (factory.contactPersonNumber ? ' (' + factory.contactPersonNumber + ')' : '')) : '';
+  const openingBal = factory ? (parseFloat(factory.openingBalance) || parseFloat(factory.currentBalance) || 0) : 0;
+
+  // Header Banner
+  doc.setFillColor(15, 23, 42); // Slate-900
+  doc.rect(0, 0, 210, 36, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(255, 255, 255);
+  doc.text('PERSONAL BROKERAGE MARGIN STATEMENT (PDF_NEW)', 14, 16);
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(203, 213, 225);
+  doc.text('Unified Credit & Debit Running Ledger Statement • Rate & Margin Immutability Verified', 14, 24);
+  doc.text(`Factory: ${factoryName}   |   Period: ${monthStr || 'All Time'}   |   Generated: ${new Date().toLocaleDateString('en-IN')}`, 14, 30);
+
+  // Combine Orders and Payments into a single chronological ledger
+  const ledgerEntries = [];
+
+  // Add Opening Balance entry if > 0
+  if (openingBal > 0) {
+    ledgerEntries.push({
+      date: 'Opening',
+      rawDate: '0000-00-00',
+      type: 'Opening Balance',
+      entity: factoryName,
+      particulars: 'Initial Opening Commission Balance',
+      debit: openingBal,
+      credit: 0
+    });
+  }
+
+  // Process Orders -> Debit (Margin Commission Earned)
+  factoryOrders.forEach(o => {
+    const items = Array.isArray(o.items) && o.items.length > 0
+      ? o.items
+      : [{ boxId: o.boxId, boxName: o.boxName, quantity: o.quantity, margin: o.margin, rate: o.rate }];
+
+    let orderMarginSum = 0;
+    const itemSummaries = [];
+
+    items.forEach(it => {
+      const b = (Array.isArray(boxDetails) ? boxDetails.find(box => box.id === it.boxId) : null) || {};
+      const margin = it.margin !== undefined ? parseFloat(it.margin) : (parseFloat(b.margin) || 0);
+      const qty = parseInt(it.quantity) || 0;
+      const marginTotal = margin * qty;
+      orderMarginSum += marginTotal;
+      itemSummaries.push(`${it.boxName || b.boxName || 'Box'} (${qty.toLocaleString('en-IN')} @ Rs. ${margin.toFixed(2)}/box)`);
+    });
+
+    ledgerEntries.push({
+      date: o.orderDate || '-',
+      rawDate: o.orderDate || '1970-01-01',
+      type: 'Order Commission (Debit)',
+      entity: o.customerName || 'Customer',
+      particulars: `Order ID: ${o.id || '-'} • ${itemSummaries.join(', ')}`,
+      debit: orderMarginSum,
+      credit: 0
+    });
+  });
+
+  // Process Payments -> Credit (Settlements Received)
+  factoryPayments.forEach(p => {
+    const amt = parseFloat(p.amountPaid) || 0;
+    ledgerEntries.push({
+      date: p.paymentDate || '-',
+      rawDate: p.paymentDate || '1970-01-01',
+      type: 'Payment Received (Credit)',
+      entity: p.factoryName || factoryName,
+      particulars: `Mode: ${p.paymentMode || 'Bank Transfer'} ${p.notes ? '• ' + p.notes : ''}`,
+      debit: 0,
+      credit: amt
+    });
+  });
+
+  // Sort chronologically (Oldest first for running balance)
+  ledgerEntries.sort((a, b) => a.rawDate.localeCompare(b.rawDate));
+
+  // Compute Running Balance & Build Table Rows
+  let runningBal = 0;
+  let totalDebitEarned = 0;
+  let totalCreditPaid = 0;
+
+  const tableBody = ledgerEntries.map(entry => {
+    runningBal += (entry.debit - entry.credit);
+    if (entry.debit > 0 && entry.type !== 'Opening Balance') totalDebitEarned += entry.debit;
+    if (entry.credit > 0) totalCreditPaid += entry.credit;
+
+    return [
+      entry.date,
+      entry.type,
+      entry.entity || '-',
+      entry.particulars,
+      entry.debit > 0 ? `Rs. ${entry.debit.toLocaleString('en-IN')}` : '-',
+      entry.credit > 0 ? `Rs. ${entry.credit.toLocaleString('en-IN')}` : '-',
+      `Rs. ${runningBal.toLocaleString('en-IN')}`
+    ];
+  });
+
+  // Table 1: Running Ledger
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(30, 41, 59);
+  doc.text('CREDIT & DEBIT RUNNING LEDGER STATEMENT', 14, 45);
+
+  doc.autoTable({
+    startY: 48,
+    margin: { left: 14, right: 14 },
+    head: [['Date', 'Type / Entry', 'Entity / Customer', 'Particulars & Line Items', 'Debit (+₹)', 'Credit (-₹)', 'Running Bal (₹)']],
+    body: tableBody.length > 0 ? tableBody : [['-', 'No Records', '-', 'No orders or payments recorded for selected filter.', '-', '-', '-']],
+    theme: 'grid',
+    headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+    bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { cellWidth: 20 },
+      1: { cellWidth: 34 },
+      2: { cellWidth: 28 },
+      3: { cellWidth: 'auto' },
+      4: { cellWidth: 22, halign: 'right' },
+      5: { cellWidth: 22, halign: 'right' },
+      6: { cellWidth: 24, halign: 'right' }
+    }
+  });
+
+  let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 120;
+  const netPending = openingBal + totalDebitEarned - totalCreditPaid;
+
+  if (finalY + 45 > 275) {
+    doc.addPage();
+    finalY = 20;
+  }
+
+  // Financial Summary Box
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(82, finalY, 114, openingBal > 0 ? 42 : 36, 3, 3, 'FD');
+
+  let boxY = finalY + 7;
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+
+  if (openingBal > 0) {
+    doc.text('Initial Opening Margin Balance:', 86, boxY);
+    doc.text(`Rs. ${openingBal.toLocaleString('en-IN')}`, 192, boxY, { align: 'right' });
+    boxY += 6;
+  }
+
+  doc.text('Total Personal Margin Earned (Debit):', 86, boxY);
+  doc.text(`Rs. ${totalDebitEarned.toLocaleString('en-IN')}`, 192, boxY, { align: 'right' });
+  boxY += 6;
+
+  doc.text('Total Factory Payments Received (Credit):', 86, boxY);
+  doc.text(`Rs. ${totalCreditPaid.toLocaleString('en-IN')}`, 192, boxY, { align: 'right' });
+  boxY += 7.5;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  if (netPending > 0) {
+    doc.setTextColor(220, 38, 38);
+    doc.text('Net Pending Commission Owed:', 86, boxY);
+    doc.text(`Rs. ${netPending.toLocaleString('en-IN')}`, 192, boxY, { align: 'right' });
+  } else {
+    doc.setTextColor(5, 150, 105);
+    doc.text('Net Commission Balance:', 86, boxY);
+    doc.text(`Rs. ${netPending.toLocaleString('en-IN')} (Settled)`, 192, boxY, { align: 'right' });
+  }
+
+  const cleanFactName = factoryName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  doc.save(`Personal_Margin_PDF_new_${cleanFactName}_${monthStr || 'all'}.pdf`);
 };

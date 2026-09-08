@@ -85,6 +85,9 @@ const initialDemoData = {
       boxId: 'b_1',
       boxName: '1kg Medicine Master Carton',
       quantity: 5000,
+      items: [
+        { boxId: 'b_1', boxName: '1kg Medicine Master Carton', quantity: 5000, rate: 45.00, margin: 5.00, notes: 'Dispatch via express cargo' }
+      ],
       orderDate: '2026-08-20',
       deliveryDate: '2026-08-28',
       notes: 'Dispatch via express cargo'
@@ -98,6 +101,9 @@ const initialDemoData = {
       boxId: 'b_2',
       boxName: '500g Inner Bottle Box',
       quantity: 10000,
+      items: [
+        { boxId: 'b_2', boxName: '500g Inner Bottle Box', quantity: 10000, rate: 18.50, margin: 2.50, notes: 'Deliver directly to Sanand plant' }
+      ],
       orderDate: '2026-08-22',
       deliveryDate: '2026-08-30',
       notes: 'Deliver directly to Sanand plant'
@@ -121,7 +127,7 @@ export const AppProvider = ({ children }) => {
     const path = window.location.pathname.replace(/^\//, '').toLowerCase();
     if (!path) return 'dashboard';
     if (path === 'products') return 'box-details';
-    const validTabs = ['dashboard', 'factories', 'customers', 'box-details', 'orders', 'payments', 'reports'];
+    const validTabs = ['dashboard', 'factories', 'customers', 'box-details', 'orders', 'payments', 'reports', 'ledger'];
     return validTabs.includes(path) ? path : 'dashboard';
   };
 

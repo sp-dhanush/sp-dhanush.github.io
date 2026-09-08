@@ -22,7 +22,7 @@ export const Dashboard = () => {
 
     items.forEach(it => {
       const b = boxDetails.find(box => box.id === it.boxId) || {};
-      const margin = parseFloat(b.margin) || 0;
+      const margin = it.margin !== undefined ? parseFloat(it.margin) : (parseFloat(b.margin) || 0);
       const qty = parseInt(it.quantity) || 0;
       totalMarginEarned += margin * qty;
       totalBoxesOrdered += qty;
@@ -43,11 +43,12 @@ export const Dashboard = () => {
     orders.filter(o => o.factoryId === f.id).forEach(o => {
       const items = Array.isArray(o.items) && o.items.length > 0
         ? o.items
-        : [{ boxId: o.boxId, quantity: o.quantity }];
+        : [{ boxId: o.boxId, quantity: o.quantity, margin: o.margin }];
 
       items.forEach(it => {
         const b = boxDetails.find(box => box.id === it.boxId) || {};
-        marginEarned += (parseFloat(b.margin) || 0) * (parseInt(it.quantity) || 0);
+        const margin = it.margin !== undefined ? parseFloat(it.margin) : (parseFloat(b.margin) || 0);
+        marginEarned += margin * (parseInt(it.quantity) || 0);
       });
     });
 

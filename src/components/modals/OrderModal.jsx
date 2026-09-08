@@ -67,13 +67,17 @@ export const OrderModal = () => {
     const custObj = customers.find(c => c.id === customerId);
     const factObj = factories.find(f => f.id === factoryId);
 
-    // Prepare summary fields
+    // Prepare summary fields with rate & margin snapshot for immutability
     const processedItems = items.map(it => {
       const b = boxDetails.find(box => box.id === it.boxId);
+      const snapshotRate = it.rate !== undefined ? parseFloat(it.rate) : (parseFloat(b ? b.rate : 0) || 0);
+      const snapshotMargin = it.margin !== undefined ? parseFloat(it.margin) : (parseFloat(b ? b.margin : 0) || 0);
       return {
         boxId: it.boxId,
         boxName: b ? b.boxName : '',
         quantity: parseInt(it.quantity) || 0,
+        rate: snapshotRate,
+        margin: snapshotMargin,
         notes: (it.notes || '').trim()
       };
     });

@@ -51,6 +51,10 @@ export const Navbar = () => {
               <i className="bi bi-bar-chart-line-fill me-1"></i>
               Reports
             </a>
+            <a href="/ledger" className={`nav-btn btn ${activeTab === 'ledger' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); handleTabClick('ledger'); }}>
+              <i className="bi bi-journal-text me-1"></i>
+              Ledger
+            </a>
 
             <div className="mobile-auth-section d-lg-none mt-3 pt-3 border-top">
               <button

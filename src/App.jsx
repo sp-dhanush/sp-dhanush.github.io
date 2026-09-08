@@ -8,6 +8,7 @@ import { Factories } from './components/Factories';
 import { Customers } from './components/Customers';
 import { Payments } from './components/Payments';
 import { Reports } from './components/Reports';
+import { Ledger } from './components/Ledger';
 
 import { FactoryModal } from './components/modals/FactoryModal';
 import { CustomerModal } from './components/modals/CustomerModal';
@@ -152,6 +153,7 @@ export const App = () => {
             {activeTab === 'orders' && <Orders />}
             {activeTab === 'payments' && <Payments />}
             {activeTab === 'reports' && <Reports />}
+            {activeTab === 'ledger' && <Ledger />}
           </>
         )}
       </main>

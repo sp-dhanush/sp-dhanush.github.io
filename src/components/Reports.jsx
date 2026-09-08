@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   exportFactoryMarginStatementPDF, 
-  exportFactoryRateStatementPDF 
+  exportFactoryRateStatementPDF,
+  exportPersonalMarginPDFNew
 } from '../utils/pdfExporter';
 import { formatINR } from '../utils/helpers';
 
@@ -45,12 +46,12 @@ export const Reports = () => {
   factoryOrders.forEach(o => {
     const items = Array.isArray(o.items) && o.items.length > 0
       ? o.items
-      : [{ boxId: o.boxId, quantity: o.quantity }];
+      : [{ boxId: o.boxId, quantity: o.quantity, margin: o.margin, rate: o.rate }];
 
     items.forEach(it => {
       const b = boxDetails.find(box => box.id === it.boxId) || {};
-      const margin = parseFloat(b.margin) || 0;
-      const rate = parseFloat(b.rate) || 0;
+      const margin = it.margin !== undefined ? parseFloat(it.margin) : (parseFloat(b.margin) || 0);
+      const rate = it.rate !== undefined ? parseFloat(it.rate) : (parseFloat(b.rate) || 0);
       const qty = parseInt(it.quantity) || 0;
       totalMarginEarned += margin * qty;
       totalRateValue += rate * qty;
@@ -73,7 +74,18 @@ export const Reports = () => {
     });
   };
 
-  // 2. Download Factory Rate / Supply Statement PDF
+  // 2. Download Personal Margin Statement PDF_new (Enhanced Ledger Statement)
+  const handleDownloadMarginPDFNew = () => {
+    exportPersonalMarginPDFNew({
+      factory: selectedFactory || { factoryName: 'All Factories Margin Ledger' },
+      monthStr,
+      factoryOrders,
+      factoryPayments,
+      boxDetails
+    });
+  };
+
+  // 3. Download Factory Rate / Supply Statement PDF
   const handleDownloadRatePDF = () => {
     exportFactoryRateStatementPDF({
       factory: selectedFactory || { factoryName: 'All Factories Supply Statement' },
@@ -92,13 +104,17 @@ export const Reports = () => {
           <div className="text-muted small">Live calculation of personal margin commissions and factory supply order rates</div>
         </div>
         <div className="d-flex flex-wrap gap-2">
-          <button className="btn btn-success d-flex align-items-center gap-2 rounded-3 px-3 py-2 shadow-sm" onClick={handleDownloadMarginPDF} title="Download Personal Brokerage Margin Statement PDF">
+          <button className="btn btn-success d-flex align-items-center gap-2 rounded-3 px-3 py-2 shadow-sm fw-semibold" onClick={handleDownloadMarginPDFNew} title="Download Enhanced Personal Brokerage Margin Statement PDF_new with Credit & Debit Running Ledger">
+            <i className="bi bi-file-earmark-diff-fill fs-5"></i>
+            <span>Download Personal Margin PDF_new</span>
+          </button>
+          <button className="btn btn-outline-success d-flex align-items-center gap-2 rounded-3 px-3 py-2 shadow-sm" onClick={handleDownloadMarginPDF} title="Download Classic Personal Brokerage Margin Statement PDF">
             <i className="bi bi-file-earmark-lock-fill fs-5"></i>
-            <span>Download Personal Margin PDF</span>
+            <span>Personal Margin PDF</span>
           </button>
           <button className="btn btn-primary d-flex align-items-center gap-2 rounded-3 px-3 py-2 shadow-sm" onClick={handleDownloadRatePDF} title="Download Factory Supply & Rate Statement PDF">
             <i className="bi bi-file-earmark-text-fill fs-5"></i>
-            <span>Download Factory Rate PDF</span>
+            <span>Factory Rate PDF</span>
           </button>
         </div>
       </div>
@@ -261,8 +277,8 @@ export const Reports = () => {
 
                   return items.map((line, idx) => {
                     const b = boxDetails.find(box => box.id === line.boxId) || {};
-                    const margin = parseFloat(b.margin) || 0;
-                    const rate = parseFloat(b.rate) || 0;
+                    const margin = line.margin !== undefined ? parseFloat(line.margin) : (parseFloat(b.margin) || 0);
+                    const rate = line.rate !== undefined ? parseFloat(line.rate) : (parseFloat(b.rate) || 0);
                     const qty = parseInt(line.quantity) || 0;
                     const totalLineMargin = margin * qty;
                     const totalLineRate = rate * qty;
