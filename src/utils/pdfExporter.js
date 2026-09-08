@@ -1054,18 +1054,22 @@ export const exportPersonalMarginPDFNew = ({ factory, monthStr, factoryOrders = 
       lastDateSeen = entry.date;
     }
 
+    // Highlight Payment Received rows with soft yellow background color
+    const isPayment = entry.type.includes('Payment Received');
+    const rowStyles = isPayment ? { fillColor: [254, 243, 199], textColor: [120, 53, 15] } : {};
+
     tableBody.push([
-      displayDate,
-      entry.type,
-      entry.entity || '-',
-      entry.boxName || '-',
-      entry.specs || '-',
-      entry.qty > 0 ? entry.qty.toLocaleString('en-IN') : '-',
-      entry.marginPerBox > 0 ? `Rs. ${entry.marginPerBox.toFixed(2)}` : '-',
-      entry.totalMargin > 0 ? `Rs. ${entry.totalMargin.toLocaleString('en-IN')}` : '-',
-      entry.debit > 0 ? `Rs. ${entry.debit.toLocaleString('en-IN')}` : '-',
-      entry.credit > 0 ? `Rs. ${entry.credit.toLocaleString('en-IN')}` : '-',
-      `Rs. ${runningBal.toLocaleString('en-IN')}`
+      { content: displayDate, styles: rowStyles },
+      { content: entry.type, styles: { ...rowStyles, fontStyle: isPayment ? 'bold' : 'normal' } },
+      { content: entry.entity || '-', styles: rowStyles },
+      { content: entry.boxName || '-', styles: rowStyles },
+      { content: entry.specs || '-', styles: rowStyles },
+      { content: entry.qty > 0 ? entry.qty.toLocaleString('en-IN') : '-', styles: { ...rowStyles, halign: 'right' } },
+      { content: entry.marginPerBox > 0 ? `Rs. ${entry.marginPerBox.toFixed(2)}` : '-', styles: { ...rowStyles, halign: 'right' } },
+      { content: entry.totalMargin > 0 ? `Rs. ${entry.totalMargin.toLocaleString('en-IN')}` : '-', styles: { ...rowStyles, halign: 'right' } },
+      { content: entry.debit > 0 ? `Rs. ${entry.debit.toLocaleString('en-IN')}` : '-', styles: { ...rowStyles, halign: 'right' } },
+      { content: entry.credit > 0 ? `Rs. ${entry.credit.toLocaleString('en-IN')}` : '-', styles: { ...rowStyles, halign: 'right', fontStyle: 'bold' } },
+      { content: `Rs. ${runningBal.toLocaleString('en-IN')}`, styles: { ...rowStyles, halign: 'right' } }
     ]);
   });
 
