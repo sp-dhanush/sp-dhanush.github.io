@@ -458,8 +458,9 @@ export const Reports = () => {
                         </tr>
                       );
                     }
+                    const isPaymentRow = row.type.includes('Payment');
                     return (
-                      <tr key={`rep_${rIdx}`}>
+                      <tr key={`rep_${rIdx}`} className={isPaymentRow ? 'table-warning fw-medium' : ''}>
                         <td className="small fw-semibold">{row.displayDate !== undefined ? row.displayDate : row.date}</td>
                         <td>
                           {row.type.includes('Debit') || row.type.includes('Commission') ? (
