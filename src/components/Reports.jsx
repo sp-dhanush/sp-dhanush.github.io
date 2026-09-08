@@ -95,6 +95,142 @@ export const Reports = () => {
     });
   };
 
+  // Prepare Merged Entries with Monthly Subtotals for Reports view
+  const rawReportEntries = [];
+
+  if (openingBal > 0) {
+    rawReportEntries.push({
+      date: 'Opening',
+      rawDate: '0000-00-00',
+      monthKey: '0000-00',
+      monthLabel: 'Opening Dues',
+      type: 'Opening Balance',
+      entity: selectedFactory ? selectedFactory.factoryName : 'All Factories',
+      boxName: '-',
+      specs: 'Initial Opening Dues',
+      qty: 0,
+      marginPerBox: 0,
+      totalMargin: 0,
+      debit: openingBal,
+      credit: 0
+    });
+  }
+
+  factoryOrders.forEach(o => {
+    const items = Array.isArray(o.items) && o.items.length > 0
+      ? o.items
+      : [{ boxId: o.boxId, boxName: o.boxName, quantity: o.quantity, margin: o.margin, rate: o.rate }];
+
+    const oDate = o.orderDate || '1970-01-01';
+    const monthKey = oDate.substring(0, 7);
+    const dateObj = new Date(oDate);
+    const monthLabel = isNaN(dateObj.getTime()) ? monthKey : dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+    items.forEach(it => {
+      const b = boxDetails.find(box => box.id === it.boxId) || {};
+      const margin = it.margin !== undefined ? parseFloat(it.margin) : (parseFloat(b.margin) || 0);
+      const qty = parseInt(it.quantity) || 0;
+      const marginTotal = margin * qty;
+
+      const dimStr = (b.length && b.width && b.height) ? `${b.length}×${b.width}×${b.height} ${b.unit || ''}` : '-';
+      const plyStr = b.ply ? `${b.ply}-Ply` : '';
+      const specsStr = [dimStr !== '-' ? dimStr : null, plyStr].filter(Boolean).join(', ') || '-';
+
+      rawReportEntries.push({
+        date: o.orderDate || '-',
+        rawDate: oDate,
+        monthKey,
+        monthLabel,
+        type: 'Order Commission',
+        entity: o.customerName || 'Customer',
+        boxName: it.boxName || b.boxName || 'Carton Box',
+        specs: specsStr,
+        qty,
+        marginPerBox: margin,
+        totalMargin: marginTotal,
+        debit: marginTotal,
+        credit: 0
+      });
+    });
+  });
+
+  factoryPayments.forEach(p => {
+    const pDate = p.paymentDate || '1970-01-01';
+    const monthKey = pDate.substring(0, 7);
+    const dateObj = new Date(pDate);
+    const monthLabel = isNaN(dateObj.getTime()) ? monthKey : dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    const amt = parseFloat(p.amountPaid) || 0;
+
+    rawReportEntries.push({
+      date: p.paymentDate || '-',
+      rawDate: pDate,
+      monthKey,
+      monthLabel,
+      type: 'Payment Received',
+      entity: p.factoryName || 'Factory',
+      boxName: `Mode: ${p.paymentMode || 'Cash'}`,
+      specs: p.notes || '-',
+      qty: 0,
+      marginPerBox: 0,
+      totalMargin: 0,
+      debit: 0,
+      credit: amt
+    });
+  });
+
+  rawReportEntries.sort((a, b) => a.rawDate.localeCompare(b.rawDate));
+
+  let repRunningBal = 0;
+  const mergedReportRows = [];
+  let curMKey = null;
+  let curMLabel = '';
+  let mQty = 0;
+  let mMarginSum = 0;
+  let mDebitSum = 0;
+  let mCreditSum = 0;
+
+  const pushReportMonthSubtotal = () => {
+    if (!curMKey || curMKey === '0000-00') return;
+    mergedReportRows.push({
+      isSubtotal: true,
+      date: 'SUBTOTAL',
+      type: `${curMLabel} Subtotal`,
+      entity: '-',
+      boxName: '-',
+      specs: 'Monthly Summary',
+      qty: mQty,
+      marginPerBox: 0,
+      totalMargin: mMarginSum,
+      debit: mDebitSum,
+      credit: mCreditSum,
+      runningBalance: repRunningBal
+    });
+    mQty = 0;
+    mMarginSum = 0;
+    mDebitSum = 0;
+    mCreditSum = 0;
+  };
+
+  rawReportEntries.forEach(entry => {
+    if (entry.monthKey !== curMKey) {
+      if (curMKey !== null) pushReportMonthSubtotal();
+      curMKey = entry.monthKey;
+      curMLabel = entry.monthLabel;
+    }
+
+    repRunningBal += (entry.debit - entry.credit);
+    mQty += entry.qty;
+    mMarginSum += entry.totalMargin;
+    mDebitSum += (entry.type !== 'Opening Balance' ? entry.debit : 0);
+    mCreditSum += entry.credit;
+
+    mergedReportRows.push({
+      ...entry,
+      runningBalance: repRunningBal
+    });
+  });
+  pushReportMonthSubtotal();
+
   return (
     <section id="tab-reports" className="tab-content active">
       {/* Header Bar with Dedicated Export Buttons */}
@@ -204,12 +340,12 @@ export const Reports = () => {
         </div>
       </div>
 
-      {/* Orders Breakdown Table with Report View Switcher */}
+      {/* Breakdown Table with Report View Switcher */}
       <div className="card border-0 shadow-sm rounded-3 overflow-hidden mb-4">
         <div className="p-3 bg-body-tertiary border-bottom d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2">
           <div className="d-flex align-items-center gap-2">
-            <div className="fw-bold font-outfit fs-6">Orders Financial Breakdown</div>
-            <span className="badge bg-secondary">{factoryOrders.length} Orders (Sorted: Newest First)</span>
+            <div className="fw-bold font-outfit fs-6">Financial Reports Table</div>
+            <span className="badge bg-secondary">{factoryOrders.length} Orders & {factoryPayments.length} Payments</span>
           </div>
 
           {/* View Mode Buttons */}
@@ -223,17 +359,24 @@ export const Reports = () => {
             </button>
             <button 
               type="button" 
+              className={`btn ${activeReportTab === 'merged_ledger' ? 'btn-success' : 'btn-outline-secondary'}`}
+              onClick={() => setActiveReportTab('merged_ledger')}
+            >
+              Merged Running Ledger (PDF_new View)
+            </button>
+            <button 
+              type="button" 
               className={`btn ${activeReportTab === 'rate' ? 'btn-primary' : 'btn-outline-secondary'}`}
               onClick={() => setActiveReportTab('rate')}
             >
-              Factory Rate / Value Report
+              Factory Rate Report
             </button>
             <button 
               type="button" 
               className={`btn ${activeReportTab === 'combined' ? 'btn-primary' : 'btn-outline-secondary'}`}
               onClick={() => setActiveReportTab('combined')}
             >
-              All Columns Combined
+              All Columns
             </button>
           </div>
         </div>
@@ -241,29 +384,96 @@ export const Reports = () => {
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0">
             <thead className="table-dark">
-              <tr>
-                <th>Order Date</th>
-                <th>Customer</th>
-                <th>Factory</th>
-                <th>Box Name</th>
-                <th>Specs</th>
-                <th>Quantity</th>
-                {(activeReportTab === 'rate' || activeReportTab === 'combined') && (
-                  <>
-                    <th>Factory Rate / Box (₹)</th>
-                    <th>Total Order Value (₹)</th>
-                  </>
-                )}
-                {(activeReportTab === 'margin' || activeReportTab === 'combined') && (
-                  <>
-                    <th>My Margin / Box (₹)</th>
-                    <th>Total Margin Earned (₹)</th>
-                  </>
-                )}
-              </tr>
+              {activeReportTab === 'merged_ledger' ? (
+                <tr>
+                  <th>Date</th>
+                  <th>Type / Entry</th>
+                  <th>Entity / Customer</th>
+                  <th>Box Name</th>
+                  <th>Specs</th>
+                  <th className="text-end">Qty</th>
+                  <th className="text-end">Margin/Box (₹)</th>
+                  <th className="text-end">Total Margin (₹)</th>
+                  <th className="text-end">Debit (+₹)</th>
+                  <th className="text-end">Credit (-₹)</th>
+                  <th className="text-end">Running Bal (₹)</th>
+                </tr>
+              ) : (
+                <tr>
+                  <th>Order Date</th>
+                  <th>Customer</th>
+                  <th>Factory</th>
+                  <th>Box Name</th>
+                  <th>Specs</th>
+                  <th>Quantity</th>
+                  {(activeReportTab === 'rate' || activeReportTab === 'combined') && (
+                    <>
+                      <th>Factory Rate / Box (₹)</th>
+                      <th>Total Order Value (₹)</th>
+                    </>
+                  )}
+                  {(activeReportTab === 'margin' || activeReportTab === 'combined') && (
+                    <>
+                      <th>My Margin / Box (₹)</th>
+                      <th>Total Margin Earned (₹)</th>
+                    </>
+                  )}
+                </tr>
+              )}
             </thead>
             <tbody>
-              {factoryOrders.length === 0 ? (
+              {activeReportTab === 'merged_ledger' ? (
+                mergedReportRows.length === 0 ? (
+                  <tr>
+                    <td colSpan="11" className="text-center py-4 text-muted">
+                      No ledger transactions matching current filter criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  mergedReportRows.map((row, rIdx) => {
+                    if (row.isSubtotal) {
+                      return (
+                        <tr key={`sub_${rIdx}`} className="table-secondary fw-bold">
+                          <td className="small">{row.date}</td>
+                          <td><span className="badge bg-dark">{row.type}</span></td>
+                          <td>-</td>
+                          <td>-</td>
+                          <td><span className="badge bg-secondary">{row.specs}</span></td>
+                          <td className="text-end tabular-nums">{row.qty > 0 ? row.qty.toLocaleString('en-IN') : '-'}</td>
+                          <td className="text-end">-</td>
+                          <td className="text-end tabular-nums text-primary">{row.totalMargin > 0 ? formatINR(row.totalMargin) : '-'}</td>
+                          <td className="text-end tabular-nums text-danger">{row.debit > 0 ? formatINR(row.debit) : '-'}</td>
+                          <td className="text-end tabular-nums text-success">{row.credit > 0 ? formatINR(row.credit) : '-'}</td>
+                          <td className="text-end tabular-nums text-primary">{formatINR(row.runningBalance)}</td>
+                        </tr>
+                      );
+                    }
+                    return (
+                      <tr key={`rep_${rIdx}`}>
+                        <td className="small fw-semibold">{row.date}</td>
+                        <td>
+                          {row.type.includes('Debit') || row.type.includes('Commission') ? (
+                            <span className="badge bg-danger-subtle text-danger border border-danger-subtle">{row.type}</span>
+                          ) : row.type.includes('Credit') || row.type.includes('Payment') ? (
+                            <span className="badge bg-success-subtle text-success border border-success-subtle">{row.type}</span>
+                          ) : (
+                            <span className="badge bg-info-subtle text-info border border-info-subtle">{row.type}</span>
+                          )}
+                        </td>
+                        <td className="fw-semibold">{row.entity}</td>
+                        <td>{row.boxName}</td>
+                        <td className="small text-muted">{row.specs}</td>
+                        <td className="text-end tabular-nums">{row.qty > 0 ? row.qty.toLocaleString('en-IN') : '-'}</td>
+                        <td className="text-end tabular-nums">{row.marginPerBox > 0 ? `₹${row.marginPerBox.toFixed(2)}` : '-'}</td>
+                        <td className="text-end tabular-nums text-primary">{row.totalMargin > 0 ? formatINR(row.totalMargin) : '-'}</td>
+                        <td className="text-end tabular-nums text-danger">{row.debit > 0 ? formatINR(row.debit) : '-'}</td>
+                        <td className="text-end tabular-nums text-success">{row.credit > 0 ? formatINR(row.credit) : '-'}</td>
+                        <td className="text-end tabular-nums fw-bold text-primary">{formatINR(row.runningBalance)}</td>
+                      </tr>
+                    );
+                  })
+                )
+              ) : factoryOrders.length === 0 ? (
                 <tr>
                   <td colSpan={activeReportTab === 'combined' ? 10 : 8} className="text-center py-4 text-muted">
                     No orders matching current filter criteria.
