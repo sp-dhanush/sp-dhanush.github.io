@@ -1018,12 +1018,15 @@ export const exportPersonalMarginPDFNew = ({ factory, monthStr, factoryOrders = 
       { content: `Rs. ${runningBal.toLocaleString('en-IN')}`, styles: { fontStyle: 'bold', halign: 'right', fillColor: [30, 41, 59], textColor: [255, 255, 255] } }
     ]);
 
-    // Reset month counters
+    // Reset month counters & lastDateSeen
     monthQty = 0;
     monthMarginSum = 0;
     monthDebitSum = 0;
     monthCreditSum = 0;
+    lastDateSeen = null;
   };
+
+  let lastDateSeen = null;
 
   rawEntries.forEach(entry => {
     if (entry.monthKey !== currentMonthKey) {
@@ -1032,6 +1035,7 @@ export const exportPersonalMarginPDFNew = ({ factory, monthStr, factoryOrders = 
       }
       currentMonthKey = entry.monthKey;
       currentMonthLabel = entry.monthLabel;
+      lastDateSeen = null;
     }
 
     runningBal += (entry.debit - entry.credit);
@@ -1044,8 +1048,14 @@ export const exportPersonalMarginPDFNew = ({ factory, monthStr, factoryOrders = 
     monthDebitSum += (entry.type !== 'Opening Balance' ? entry.debit : 0);
     monthCreditSum += entry.credit;
 
+    // Merge consecutive duplicate dates visually
+    const displayDate = (entry.date && entry.date === lastDateSeen) ? '' : entry.date;
+    if (entry.date) {
+      lastDateSeen = entry.date;
+    }
+
     tableBody.push([
-      entry.date,
+      displayDate,
       entry.type,
       entry.entity || '-',
       entry.boxName || '-',

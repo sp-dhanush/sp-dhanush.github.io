@@ -188,12 +188,14 @@ export const Reports = () => {
   let mMarginSum = 0;
   let mDebitSum = 0;
   let mCreditSum = 0;
+  let repLastDateSeen = null;
 
   const pushReportMonthSubtotal = () => {
     if (!curMKey || curMKey === '0000-00') return;
     mergedReportRows.push({
       isSubtotal: true,
       date: 'SUBTOTAL',
+      displayDate: 'SUBTOTAL',
       type: `${curMLabel} Subtotal`,
       entity: '-',
       boxName: '-',
@@ -209,6 +211,7 @@ export const Reports = () => {
     mMarginSum = 0;
     mDebitSum = 0;
     mCreditSum = 0;
+    repLastDateSeen = null;
   };
 
   rawReportEntries.forEach(entry => {
@@ -216,6 +219,7 @@ export const Reports = () => {
       if (curMKey !== null) pushReportMonthSubtotal();
       curMKey = entry.monthKey;
       curMLabel = entry.monthLabel;
+      repLastDateSeen = null;
     }
 
     repRunningBal += (entry.debit - entry.credit);
@@ -224,8 +228,14 @@ export const Reports = () => {
     mDebitSum += (entry.type !== 'Opening Balance' ? entry.debit : 0);
     mCreditSum += entry.credit;
 
+    const displayDate = (entry.date && entry.date === repLastDateSeen) ? '' : entry.date;
+    if (entry.date) {
+      repLastDateSeen = entry.date;
+    }
+
     mergedReportRows.push({
       ...entry,
+      displayDate,
       runningBalance: repRunningBal
     });
   });
@@ -450,7 +460,7 @@ export const Reports = () => {
                     }
                     return (
                       <tr key={`rep_${rIdx}`}>
-                        <td className="small fw-semibold">{row.date}</td>
+                        <td className="small fw-semibold">{row.displayDate !== undefined ? row.displayDate : row.date}</td>
                         <td>
                           {row.type.includes('Debit') || row.type.includes('Commission') ? (
                             <span className="badge bg-danger-subtle text-danger border border-danger-subtle">{row.type}</span>
